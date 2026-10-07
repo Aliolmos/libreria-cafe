@@ -7,7 +7,7 @@ const ONLINE_MS = 5 * 60 * 1000;     // conectado = actividad en los últimos 5 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let unsubs = [], tick = null;
-let access = [], sessions = [], denied = [], errors = [], allMoves = [], todayMoves = [];
+let blocked = [], sessions = [], errors = [], allMoves = [], todayMoves = [];
 let connected = null;
 
 const startOfDay = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
@@ -17,13 +17,12 @@ function start(){
   stop();
   const {fs} = S();
   const err = what => e => { connected = false; renderHealth(); console.warn("Panel admin:", what, e.code); };
-  unsubs.push(fs.doc("config/access").onSnapshot({includeMetadataChanges:true}, d => {
-    access = (d.exists && d.data().users) || [];
+  unsubs.push(fs.doc("config/blocked").onSnapshot({includeMetadataChanges:true}, d => {
+    blocked = (d.exists && d.data().emails) || [];
     connected = !d.metadata.fromCache;
     renderUsers(); renderHealth();
-  }, err("usuarios")));
+  }, err("bloqueados")));
   unsubs.push(fs.collection("sessions").onSnapshot(s => { sessions = s.docs.map(d => d.data()); renderUsers(); renderHealth(); }, err("sesiones")));
-  unsubs.push(fs.collection("denied").orderBy("ts","desc").limit(50).onSnapshot(s => { denied = s.docs.map(d => ({id:d.id, ...d.data()})); renderDenied(); renderHealth(); }, err("intentos")));
   unsubs.push(fs.collection("errors").orderBy("ts","desc").limit(50).onSnapshot(s => { errors = s.docs.map(d => ({id:d.id, ...d.data()})); renderErrors(); renderHealth(); }, err("errores")));
   unsubs.push(fs.collection("moves").orderBy("ts","desc").limit(300).onSnapshot(s => { allMoves = s.docs.map(d => d.data()); renderMoves(); }, err("historial")));
   unsubs.push(fs.collection("moves").where("ts", ">=", startOfDay()).onSnapshot(s => { todayMoves = s.docs.map(d => d.data()); renderUsers(); renderHealth(); }, err("movimientos de hoy")));
@@ -50,11 +49,10 @@ function renderHealth(){
   $("#hErrors").textContent = errs24;
   $("#hErrBox").classList.toggle("bad", errs24 > 0);
 
-  const pending = denied.length + errs24;
   const badge = $("#adminBadge");
-  badge.hidden = pending === 0;
-  badge.textContent = pending;
-  badge.title = `${denied.length} intento(s) de ingreso · ${errs24} error(es)`;
+  badge.hidden = errs24 === 0;
+  badge.textContent = errs24;
+  badge.title = `${errs24} error(es) en las últimas 24 h`;
 }
 
 /* ---------- usuarios ---------- */
@@ -62,21 +60,25 @@ function renderUsers(){
   const {esc, timeAgo, me} = S();
   const now = Date.now(), sod = startOfDay();
   const bySession = new Map(sessions.map(s => [s.email, s]));
-  const emails = [...new Set([me.email, ...access])];
+  // Primero los conectados, después por último ingreso.
+  const emails = [...new Set([me.email, ...sessions.slice().sort((a,b) => (b.lastSeen||0) - (a.lastSeen||0)).map(s => s.email), ...blocked])];
   $("#userRows").innerHTML = emails.map(email => {
     const s = bySession.get(email);
     const isOnline = s && now - (s.lastSeen||0) < ONLINE_MS;
     const movs = todayMoves.filter(m => m.by === email && m.ts >= sod).length;
     const isMe = email === me.email;
+    const isBlocked = blocked.includes(email);
     return `<tr data-email="${esc(email)}">
       <td><div class="who">
         ${s && s.photo ? `<img src="${esc(s.photo)}" alt="" referrerpolicy="no-referrer">` : ""}
-        <div><div>${esc(s ? s.name : email)} ${isMe ? '<span class="tag">Propietaria</span>' : ""}</div><div class="em">${esc(email)}</div></div>
+        <div><div>${esc(s ? s.name : email)} ${isMe ? '<span class="tag">Propietaria</span>' : ""}${isBlocked ? '<span class="pill out">Bloqueado</span>' : ""}</div><div class="em">${esc(email)}</div></div>
       </div></td>
-      <td class="t">${s ? (isOnline ? '<span class="online"></span>Conectado ahora' : "hace " + timeAgo(s.lastSeen).replace("recién","un momento")) : "Nunca entró"}</td>
+      <td class="t">${s ? (isOnline && !isBlocked ? '<span class="online"></span>Conectado ahora' : "hace " + timeAgo(s.lastSeen).replace("recién","un momento")) : "—"}</td>
       <td class="t">${s ? esc(s.device || "—") : "—"}</td>
       <td class="r num">${movs}</td>
-      <td class="r">${isMe ? "" : `<button class="btn sm danger" type="button" data-remove>Quitar acceso</button>`}</td>
+      <td class="r">${isMe ? "" : isBlocked
+        ? `<button class="btn sm" type="button" data-unblock>Desbloquear</button>`
+        : `<button class="btn sm danger" type="button" data-block>Bloquear</button>`}</td>
     </tr>`;
   }).join("");
   const sel = $("#movesUser"), cur = sel.value;
@@ -84,47 +86,19 @@ function renderUsers(){
   sel.innerHTML = '<option value="">Todos los usuarios</option>' + known.map(e => `<option${e===cur?" selected":""}>${esc(e)}</option>`).join("");
 }
 $("#userRows").addEventListener("click", async e => {
-  const b = e.target.closest("[data-remove]"); if (!b) return;
+  const b = e.target.closest("[data-block],[data-unblock]"); if (!b) return;
   const email = b.closest("tr").dataset.email;
-  if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Confirmar"; setTimeout(() => { b.classList.remove("armed"); b.textContent = "Quitar acceso"; }, 4000); return; }
+  const FV = firebase.firestore.FieldValue;
+  if (b.hasAttribute("data-block") && !b.classList.contains("armed")) {
+    b.classList.add("armed"); b.textContent = "Confirmar bloqueo";
+    setTimeout(() => { b.classList.remove("armed"); b.textContent = "Bloquear"; }, 4000);
+    return;
+  }
+  const block = b.hasAttribute("data-block");
   try {
-    await S().fs.doc("config/access").set({users: firebase.firestore.FieldValue.arrayRemove(email)}, {merge:true});
-    S().toast("Se quitó el acceso a " + email);
-  } catch(ex){ S().toast("No se pudo quitar el acceso (" + ex.code + ")."); }
-});
-async function authorize(email){
-  email = String(email || "").trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { S().toast("Escribí un correo válido."); return false; }
-  try {
-    await S().fs.doc("config/access").set({users: firebase.firestore.FieldValue.arrayUnion(email)}, {merge:true});
-    S().toast("Acceso autorizado para " + email);
-    return true;
-  } catch(ex){ S().toast("No se pudo autorizar (" + ex.code + ")."); return false; }
-}
-$("#addUserForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  if (await authorize($("#newUserEmail").value)) $("#newUserEmail").value = "";
-});
-
-/* ---------- intentos sin permiso ---------- */
-function renderDenied(){
-  const {esc} = S();
-  const el = $("#deniedList");
-  if (!denied.length) { el.innerHTML = '<li class="empty">Nadie intentó entrar sin permiso.</li>'; return; }
-  el.innerHTML = denied.map(d => `<li data-id="${esc(d.id)}" data-email="${esc(d.email)}">
-    <div class="row"><b>${esc(d.name || d.email)}</b><span class="meta">${fmtDate(d.ts)}</span></div>
-    <div class="meta">${esc(d.email)} · ${esc(d.device || "")}</div>
-    <div class="row" style="justify-content:flex-start">
-      <button class="btn sm primary" type="button" data-act="allow">Autorizar</button>
-      <button class="btn sm" type="button" data-act="dismiss">Descartar</button>
-    </div>
-  </li>`).join("");
-}
-$("#deniedList").addEventListener("click", async e => {
-  const b = e.target.closest("button[data-act]"); if (!b) return;
-  const li = b.closest("li");
-  if (b.dataset.act === "allow" && !(await authorize(li.dataset.email))) return;
-  S().fs.doc("denied/" + li.dataset.id).delete().catch(() => {});
+    await S().fs.doc("config/blocked").set({emails: block ? FV.arrayUnion(email) : FV.arrayRemove(email)}, {merge:true});
+    S().toast(block ? "Bloqueado: " + email + ". Ya no puede ver ni modificar el stock." : "Desbloqueado: " + email);
+  } catch(ex){ S().toast("No se pudo guardar el cambio (" + ex.code + ")."); }
 });
 
 /* ---------- errores ---------- */

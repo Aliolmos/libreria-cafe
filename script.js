@@ -55,7 +55,7 @@ function makeFirestoreStore(){
         else setStatus("live","Conectado · " + (auth.currentUser?.email || ""));
       }, e => {
         reportError("conexión", e.code);
-        if (e.code === "permission-denied") setStatus("bad","Tu usuario no tiene permiso para ver el stock. Pedile al administrador que lo habilite.");
+        if (e.code === "permission-denied") setStatus("bad","Tu cuenta no tiene permiso para ver el stock (puede estar bloqueada).");
         else setStatus("bad","Sin conexión con la base (" + e.code + ")");
       }));
     },
@@ -96,17 +96,16 @@ async function onSignedIn(u){
   showScreen("#bootScreen");
   const email = (u.email || "").toLowerCase();
   me = {uid:u.uid, email, name:u.displayName || email, photo:u.photoURL || "", isAdmin: ADMIN_EMAILS.includes(email)};
-  // Comprobar acceso: leer la lista de usuarios solo funciona si las reglas te dejan.
-  try {
-    await fs.doc("config/access").get();
-  } catch(e){
-    if (e.code === "permission-denied") {
-      fs.doc("denied/" + u.uid).set({email, name:me.name, photo:me.photo, device:deviceName(), ts:Date.now()}).catch(() => {});
-      $("#deniedEmail").textContent = email;
-      showScreen("#deniedScreen");
-      return;
-    }
-    // Sin internet: entrar igual con la caché offline.
+  // Cualquier cuenta de Google entra, salvo que la propietaria la haya bloqueado.
+  if (!me.isAdmin) {
+    try {
+      const b = await fs.doc("config/blocked").get();
+      if (b.exists && (b.data().emails || []).includes(email)) {
+        $("#deniedEmail").textContent = email;
+        showScreen("#deniedScreen");
+        return;
+      }
+    } catch(e){ /* sin internet: entrar igual con la caché offline */ }
   }
   startApp();
 }

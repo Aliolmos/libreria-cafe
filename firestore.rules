@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Propietaria del sistema: ve el panel admin y decide quién tiene acceso.
+    // Propietaria del sistema: ve el panel admin y puede bloquear usuarios.
     function esAdmin() {
       return conCuenta() && correo() in ["aliolmos19@gmail.com"];
     }
@@ -14,15 +14,18 @@ service cloud.firestore {
     function correo() {
       return request.auth.token.email.lower();
     }
-    // Usuarios autorizados: la lista se maneja desde el Panel admin (documento config/access).
+    // Cuentas bloqueadas desde el Panel admin (documento config/blocked).
+    function bloqueado() {
+      return exists(/databases/$(database)/documents/config/blocked)
+        && correo() in get(/databases/$(database)/documents/config/blocked).data.emails;
+    }
+    // Cualquier cuenta de Google entra, salvo las bloqueadas.
     function esPersonal() {
-      return esAdmin() || (conCuenta()
-        && exists(/databases/$(database)/documents/config/access)
-        && correo() in get(/databases/$(database)/documents/config/access).data.users);
+      return esAdmin() || (conCuenta() && !bloqueado());
     }
 
-    match /config/access {
-      allow read: if esPersonal();
+    match /config/blocked {
+      allow read: if conCuenta();
       allow write: if esAdmin();
     }
     match /products/{id} {
@@ -38,12 +41,6 @@ service cloud.firestore {
     match /sessions/{uid} {
       allow read: if esAdmin() || (esPersonal() && request.auth.uid == uid);
       allow write: if esPersonal() && request.auth.uid == uid;
-    }
-    // Intentos de ingreso de cuentas sin permiso.
-    match /denied/{uid} {
-      allow read, delete: if esAdmin();
-      allow create, update: if conCuenta() && request.auth.uid == uid
-        && request.resource.data.email == correo();
     }
     // Errores que ocurren en los dispositivos de los usuarios.
     match /errors/{id} {
