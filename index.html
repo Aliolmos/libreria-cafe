@@ -57,9 +57,10 @@
     </div>
   </header>
 
-  <nav class="tabs" id="tabs" hidden>
+  <nav class="tabs" id="tabs">
     <button type="button" data-view="stock" aria-pressed="true">Stock</button>
-    <button type="button" data-view="admin" aria-pressed="false">Panel admin <span class="badge" id="adminBadge" hidden></span></button>
+    <button type="button" data-view="caja" aria-pressed="false">Caja</button>
+    <button type="button" data-view="admin" aria-pressed="false" id="tabAdmin" hidden>Panel admin <span class="badge" id="adminBadge" hidden></span></button>
   </nav>
 
   <div class="view" id="stockView">
@@ -136,6 +137,77 @@
   </div>
   </div><!-- /stockView -->
 
+  <!-- Caja: ventas del día, deudas y cuentas mensuales -->
+  <div class="view" id="cajaView" hidden>
+    <div class="caja-bar">
+      <label class="field inline"><span class="label">Día</span><input type="date" id="cDay"></label>
+      <button class="btn sm" type="button" id="cToday">Hoy</button>
+    </div>
+
+    <section class="metrics caja-metrics" aria-label="Resumen del día">
+      <div class="metric main-metric"><span class="label" id="cTotalLabel">Total de hoy</span><span class="v" id="cTotal">$0,00</span></div>
+      <div class="metric"><span class="label">Efectivo</span><span class="v" id="cCash">$0,00</span></div>
+      <div class="metric"><span class="label">Transferencia / MP</span><span class="v" id="cTransfer">$0,00</span></div>
+      <div class="metric"><span class="label">Tarjeta</span><span class="v" id="cCard">$0,00</span></div>
+      <div class="metric alert"><span class="label">Deudas sin cobrar</span><span class="v" id="cOwed">$0,00</span><span class="meta" id="cOwedN">nadie debe</span></div>
+    </section>
+
+    <div class="caja-grid">
+      <section class="panel" aria-label="Ventas del día">
+        <div class="panel-head"><h2>Ventas del día</h2></div>
+        <form class="caja-form" id="saleForm" novalidate>
+          <input id="sAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Monto" aria-label="Monto de la venta">
+          <select id="sMethod" aria-label="Medio de pago">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia / MP</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+          <input id="sNote" class="grow" maxlength="120" placeholder="Detalle (opcional): café + medialuna" aria-label="Detalle">
+          <button class="btn primary" type="submit">Agregar venta</button>
+        </form>
+        <ul class="plain-list" id="salesList"><li class="empty">No hay ventas cargadas hoy.</li></ul>
+      </section>
+
+      <section class="panel" aria-label="Deudas">
+        <div class="panel-head">
+          <h2>Deudas (fiado)</h2>
+          <div class="toggle" role="group" aria-label="Ver deudas">
+            <button type="button" data-debts="pending" aria-pressed="true">Deben</button>
+            <button type="button" data-debts="paid" aria-pressed="false">Ya pagaron</button>
+          </div>
+        </div>
+        <form class="caja-form" id="debtForm" novalidate>
+          <input id="dName" class="grow" maxlength="80" list="debtNames" placeholder="Nombre de la persona" aria-label="Nombre de la persona" autocomplete="off">
+          <datalist id="debtNames"></datalist>
+          <input id="dAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Monto" aria-label="Monto que debe">
+          <input id="dNote" class="grow" maxlength="120" placeholder="Qué se llevó (opcional)" aria-label="Detalle">
+          <button class="btn primary" type="submit">Anotar deuda</button>
+        </form>
+        <ul class="plain-list" id="debtList"><li class="empty">Nadie debe nada.</li></ul>
+      </section>
+    </div>
+
+    <section class="panel" aria-label="Cuentas mensuales">
+      <div class="panel-head">
+        <div>
+          <h2>Cuentas mensuales</h2>
+          <span class="meta">Colegio o particulares que retiran durante el mes y pagan el total a fin de mes.</span>
+        </div>
+        <label class="field inline"><span class="label">Mes</span><input type="month" id="cMonth"></label>
+      </div>
+      <form class="caja-form" id="accForm" novalidate>
+        <input id="aName" class="grow" maxlength="80" placeholder="Nombre: Colegio San Martín, Prof. García…" aria-label="Nombre de la cuenta">
+        <select id="aType" aria-label="Tipo de cuenta">
+          <option value="colegio">Colegio / institución</option>
+          <option value="persona">Particular</option>
+        </select>
+        <button class="btn" type="submit">+ Nueva cuenta</button>
+      </form>
+      <datalist id="productNames"></datalist>
+      <div class="acc-grid" id="accGrid"></div>
+    </section>
+  </div>
+
   <!-- Panel admin: solo lo ve la propietaria -->
   <div class="view" id="adminView" hidden>
     <section class="metrics health" aria-label="Estado del sistema">
@@ -146,6 +218,17 @@
     </section>
 
     <div class="admin-grid">
+      <section class="panel wide" aria-label="Datos del comercio">
+        <div class="panel-head"><h2>Datos del comercio</h2><span class="meta">Aparecen arriba en cada resumen o comprobante.</span></div>
+        <form class="caja-form" id="bizForm" novalidate>
+          <input id="bizName" class="grow" maxlength="80" placeholder="Nombre del comercio" aria-label="Nombre del comercio">
+          <input id="bizAddress" class="grow" maxlength="120" placeholder="Dirección" aria-label="Dirección">
+          <input id="bizPhone" maxlength="40" placeholder="Teléfono / WhatsApp" aria-label="Teléfono">
+          <input id="bizCuit" maxlength="20" placeholder="CUIT (opcional)" aria-label="CUIT">
+          <button class="btn primary" type="submit">Guardar</button>
+        </form>
+      </section>
+
       <section class="panel" aria-label="Usuarios">
         <div class="panel-head"><h2>Usuarios que entraron</h2></div>
         <div class="table-wrap">
@@ -228,6 +311,19 @@
   </div></div>
 </dialog>
 
+<!-- Resumen tipo factura -->
+<dialog id="dlgInvoice" aria-labelledby="dlgInvoiceTitle" class="wide-dialog">
+  <div class="dlg-head"><h2 id="dlgInvoiceTitle">Resumen</h2><button class="btn sm" type="button" data-close>Cerrar</button></div>
+  <div class="dlg-body">
+    <div class="label-preview"><canvas id="invCanvas"></canvas></div>
+  </div>
+  <div class="dlg-foot"><div class="right">
+    <button class="btn" type="button" id="invCopy">Copiar texto</button>
+    <button class="btn" type="button" id="invDownload">Descargar imagen</button>
+    <button class="btn primary" type="button" id="invShare" hidden>Compartir (WhatsApp…)</button>
+  </div></div>
+</dialog>
+
 <div class="toast-host" id="toasts" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
@@ -236,6 +332,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="script.js"></script>
+<script src="caja.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

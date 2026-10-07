@@ -42,6 +42,27 @@ service cloud.firestore {
       allow read: if esAdmin() || (esPersonal() && request.auth.uid == uid);
       allow write: if esPersonal() && request.auth.uid == uid;
     }
+    // Datos del comercio que salen en los resúmenes (los edita la admin).
+    match /config/business {
+      allow read: if esPersonal();
+      allow write: if esAdmin();
+    }
+    // Caja: ventas del día, deudas (fiado) y cuentas mensuales.
+    match /sales/{id} {
+      allow read, write: if esPersonal();
+    }
+    match /debts/{id} {
+      allow read, write: if esPersonal();
+    }
+    match /accounts/{id} {
+      allow read, write: if esPersonal();
+    }
+    match /accountEntries/{id} {
+      allow read, write: if esPersonal();
+    }
+    match /accountMonths/{id} {
+      allow read, write: if esPersonal();
+    }
     // Errores que ocurren en los dispositivos de los usuarios.
     match /errors/{id} {
       allow read, delete: if esAdmin();

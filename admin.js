@@ -26,8 +26,24 @@ function start(){
   unsubs.push(fs.collection("errors").orderBy("ts","desc").limit(50).onSnapshot(s => { errors = s.docs.map(d => ({id:d.id, ...d.data()})); renderErrors(); renderHealth(); }, err("errores")));
   unsubs.push(fs.collection("moves").orderBy("ts","desc").limit(300).onSnapshot(s => { allMoves = s.docs.map(d => d.data()); renderMoves(); }, err("historial")));
   unsubs.push(fs.collection("moves").where("ts", ">=", startOfDay()).onSnapshot(s => { todayMoves = s.docs.map(d => d.data()); renderUsers(); renderHealth(); }, err("movimientos de hoy")));
+  unsubs.push(fs.doc("config/business").onSnapshot(d => {
+    const b = (d.exists && d.data()) || {};
+    [["#bizName","name"],["#bizAddress","address"],["#bizPhone","phone"],["#bizCuit","cuit"]].forEach(([sel,k]) => {
+      if (document.activeElement !== $(sel)) $(sel).value = b[k] || "";
+    });
+  }, err("datos del comercio")));
   tick = setInterval(() => { renderUsers(); renderHealth(); }, 30 * 1000);
 }
+$("#bizForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const data = {
+    name: $("#bizName").value.trim(), address: $("#bizAddress").value.trim(),
+    phone: $("#bizPhone").value.trim(), cuit: $("#bizCuit").value.trim()
+  };
+  if (!data.name) return S().toast("Escribí al menos el nombre del comercio.");
+  try { await S().fs.doc("config/business").set(data); S().toast("Datos del comercio guardados"); }
+  catch(ex){ S().toast("No se pudieron guardar (" + ex.code + ")."); }
+});
 function stop(){
   unsubs.splice(0).forEach(u => u());
   clearInterval(tick);
@@ -124,7 +140,7 @@ function renderMoves(){
   const {esc, int} = S();
   const who = $("#movesUser").value;
   const list = allMoves.filter(m => !who || m.by === who);
-  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición"};
+  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición", cuenta:"Cuenta mensual"};
   $("#allMoves").innerHTML = list.map(m => {
     const d = m.type === "set" ? "=" + m.qtyAfter : (m.delta > 0 ? "+" : "") + m.delta;
     const color = m.type === "set" ? "--accent" : m.delta >= 0 ? "--ok" : "--bad";

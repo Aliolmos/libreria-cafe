@@ -124,19 +124,21 @@ function startApp(){
   $("#userName").textContent = me.name;
   const img = $("#userPhoto");
   if (me.photo) { img.src = me.photo; img.hidden = false; } else img.hidden = true;
-  $("#tabs").hidden = !me.isAdmin;
+  $("#tabAdmin").hidden = !me.isAdmin;
   showView("stock");
   store = makeFirestoreStore();
   store.onProducts(list => { products = new Map(list.map(p => [p.code, p])); render(); });
   store.onMoves(list => { moves = list; renderHistory(); });
   touchSession();
   heartbeat = setInterval(() => { if (document.visibilityState === "visible") touchSession(); }, 2 * 60 * 1000);
+  if (window.Caja) window.Caja.start();
   if (me.isAdmin && window.AdminPanel) window.AdminPanel.start();
   scanInput.focus();
 }
 function stopApp(){
   if (store) store.stop();
   if (window.AdminPanel) window.AdminPanel.stop();
+  if (window.Caja) window.Caja.stop();
   clearInterval(heartbeat);
   store = null; me = null; products = new Map(); moves = [];
   showScreen("#loginScreen");
@@ -144,6 +146,7 @@ function stopApp(){
 
 function showView(v){
   $("#stockView").hidden = v !== "stock";
+  $("#cajaView").hidden = v !== "caja";
   $("#adminView").hidden = v !== "admin";
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === v)));
   if (v === "stock") scanInput.focus();
@@ -390,7 +393,7 @@ let buf = "", lastT = 0, gaps = [];
 document.addEventListener("keydown", e => {
   const t = e.target;
   const typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-  if (typing || document.querySelector("dialog[open]")) { buf = ""; return; }
+  if (typing || document.querySelector("dialog[open]") || $("#stockView").hidden) { buf = ""; return; }
   const now = performance.now();
   if (now - lastT > 80) { buf = ""; gaps = []; }
   else gaps.push(now - lastT);
@@ -685,6 +688,6 @@ window.Stock = {
   fs, auth, esc, money, int, toast, timeAgo, deviceName,
   get me(){ return me; },
   get products(){ return products; },
-  showView
+  showView, changeStock, saveFile
 };
 })();
