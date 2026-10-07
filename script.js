@@ -186,6 +186,32 @@ function status(p){
 }
 const statusLabel = {ok:"OK", low:"Bajo", out:"Agotado"};
 
+/* ---------- categorías ---------- */
+const CATEGORIES = {
+  "Librería": [
+    "Cuadernos A4", "Cuadernos oficio", "Cuadernos chicos y anotadores", "Carpetas y repuestos",
+    "Hojas, resmas y papeles", "Cartulinas, afiches y papel glasé", "Lápices de colores", "Lápices negros",
+    "Lapiceras y biromes", "Marcadores y resaltadores", "Gomas y sacapuntas", "Reglas y geometría",
+    "Adhesivos y plasticolas", "Tijeras y cutters", "Témperas y pinturas", "Correctores",
+    "Mochilas y cartucheras", "Agendas", "Fotocopias e impresiones", "Otros de librería"
+  ],
+  "Perfumería": [
+    "Perfumes y colonias", "Cremas corporales", "Cremas faciales", "Maquillaje",
+    "Cuidado del cabello", "Jabones y cuidado personal", "Desodorantes", "Protector solar",
+    "Sets de regalo", "Otros de perfumería"
+  ]
+};
+const BRANDS = ["Avon", "Natura", "Rivadavia", "Gloria", "Éxito", "Ledesma", "Laprida", "Bic", "Faber-Castell", "Filgo", "Maped", "Pizzini", "Simball", "Staedtler", "Paper Mate", "Plantec", "Alba", "Sifap"];
+const groupOf = cat => Object.keys(CATEGORIES).find(g => CATEGORIES[g].includes(cat)) || "";
+function fillCategorySelect(selected){
+  const known = groupOf(selected);
+  $("#fCat").innerHTML = '<option value="">Sin categoría</option>' +
+    Object.entries(CATEGORIES).map(([g, subs]) =>
+      `<optgroup label="${esc(g)}">${subs.map(s => `<option${s === selected ? " selected" : ""}>${esc(s)}</option>`).join("")}</optgroup>`).join("") +
+    // Una categoría vieja (anterior a esta lista) se conserva para no perderla al editar.
+    (selected && !known ? `<optgroup label="Anterior"><option selected>${esc(selected)}</option></optgroup>` : "");
+}
+
 function render(){
   const all = [...products.values()];
   // métricas
@@ -196,18 +222,24 @@ function render(){
   $("#mLow").textContent = int(lowN);
   $("#mLowBox").classList.toggle("alert", lowN > 0);
 
-  // categorías
-  const cats = [...new Set(all.map(p => (p.cat||"").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b,"es"));
+  // categorías: Librería y Perfumería, más las viejas que no estén en la lista
   const cf = $("#catFilter"), cur = cf.value;
-  cf.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option${c===cur?" selected":""}>${esc(c)}</option>`).join("");
-  $("#catList").innerHTML = cats.map(c => `<option value="${esc(c)}">`).join("");
+  const legacy = [...new Set(all.map(p => (p.cat||"").trim()).filter(c => c && !groupOf(c)))].sort((a,b) => a.localeCompare(b,"es"));
+  const opt = (v, label) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(label)}</option>`;
+  cf.innerHTML = opt("", "Todas las categorías") +
+    Object.entries(CATEGORIES).map(([g, subs]) =>
+      `<optgroup label="${esc(g)}">${opt("g:" + g, "Toda " + (g === "Librería" ? "la librería" : "la perfumería"))}${subs.map(s => opt("c:" + s, s)).join("")}</optgroup>`).join("") +
+    (legacy.length ? `<optgroup label="Otras">${legacy.map(c => opt("c:" + c, c)).join("")}</optgroup>` : "");
+  const brands = [...new Set([...BRANDS, ...all.map(p => (p.brand||"").trim()).filter(Boolean)])].sort((a,b) => a.localeCompare(b,"es"));
+  $("#brandList").innerHTML = brands.map(b => `<option value="${esc(b)}">`).join("");
 
   // filtros
   const q = $("#search").value.trim().toLowerCase();
   const cat = cf.value, sf = $("#stockFilter").value;
+  const inCat = p => !cat || (cat.startsWith("g:") ? groupOf((p.cat||"").trim()) === cat.slice(2) : (p.cat||"").trim() === cat.slice(2));
   let list = all.filter(p =>
-    (!q || [p.name,p.code,p.cat].some(v => String(v||"").toLowerCase().includes(q))) &&
-    (!cat || (p.cat||"").trim() === cat) &&
+    (!q || [p.name,p.code,p.cat,p.brand].some(v => String(v||"").toLowerCase().includes(q))) &&
+    inCat(p) &&
     (!sf || status(p) === sf));
   const val = p => sort.key === "value" ? (Number(p.qty)||0)*(Number(p.price)||0) : p[sort.key];
   list.sort((a,b) => {
@@ -220,7 +252,7 @@ function render(){
   $("#rows").innerHTML = list.map(p => {
     const st = status(p);
     return `<tr data-code="${esc(p.code)}">
-      <td class="c-name"><div class="p-name">${esc(p.name)}</div>${p.cat ? `<div class="p-cat">${esc(p.cat)}</div>` : ""}</td>
+      <td class="c-name"><div class="p-name">${esc(p.name)}</div>${p.cat || p.brand ? `<div class="p-cat">${esc([groupOf(p.cat), p.cat, p.brand].filter(Boolean).join(" · "))}</div>` : ""}</td>
       <td class="c-code"><span class="code">${esc(p.code)}</span></td>
       <td class="c-price r num">${money(p.price)}</td>
       <td class="c-stock"><span class="stock-cell">
@@ -454,7 +486,8 @@ function openProduct(code, newCode, newName){
   $("#fPrice").value = p ? p.price : "";
   $("#fQty").value = p ? p.qty : (newCode && mode === "in" ? Math.max(1, parseInt($("#scanQty").value,10)||1) : 0);
   $("#fMin").value = p ? (p.min ?? 5) : 5;
-  $("#fCat").value = p ? (p.cat || "") : "";
+  fillCategorySelect(p ? (p.cat || "") : "");
+  $("#fBrand").value = p ? (p.brand || "") : "";
   $("#formErr").hidden = true;
   const del = $("#btnDelete"); del.hidden = !p; del.classList.remove("armed"); del.textContent = "Eliminar";
   dlgP.showModal();
@@ -538,6 +571,7 @@ $("#productForm").addEventListener("submit", async e => {
     code, name, price: Math.round(price*100)/100,
     qty: isNaN(qty) ? 0 : qty, min: isNaN(min) ? 0 : min,
     cat: $("#fCat").value.trim(),
+    brand: $("#fBrand").value.trim(),
     createdAt: prev ? (prev.createdAt || Date.now()) : Date.now(),
     updatedAt: Date.now()
   };
@@ -642,13 +676,13 @@ $("#importFile").addEventListener("change", async e => {
 
 /* ---------- ejemplos ---------- */
 $("#btnSample").addEventListener("click", async () => {
-  const mk = (name, price, qty, min, cat, code) => ({name:"[Ejemplo] " + name, price, qty, min, cat, code: code || generateCode(), createdAt:Date.now(), updatedAt:Date.now()});
+  const mk = (name, price, qty, min, cat, brand) => ({name:"[Ejemplo] " + name, price, qty, min, cat, brand, code: generateCode(), createdAt:Date.now(), updatedAt:Date.now()});
   const list = [
-    mk("Yerba mate 1 kg", 4890, 24, 6, "Almacén"),
-    mk("Aceite de girasol 1,5 L", 3150, 4, 6, "Almacén"),
-    mk("Detergente 750 ml", 1980, 0, 4, "Limpieza"),
-    mk("Pilas AA x4", 5600, 12, 3, "Bazar"),
-    mk("Cinta de embalar 48 mm", 1250, 30, 10, "Bazar")
+    mk("Cuaderno A4 rayado 48 hojas", 6500, 20, 5, "Cuadernos A4", "Rivadavia"),
+    mk("Lápices de colores x12 largos", 5800, 3, 4, "Lápices de colores", "Faber-Castell"),
+    mk("Lápiz negro HB", 650, 60, 15, "Lápices negros", "Staedtler"),
+    mk("Crema corporal Tododia 400 ml", 18900, 0, 2, "Cremas corporales", "Natura"),
+    mk("Perfume femenino 50 ml", 24500, 4, 2, "Perfumes y colonias", "Avon")
   ];
   const ok = await guard(async () => { for (const p of list) await store.save(p); });
   if (ok) toast("Cargados 5 productos de ejemplo. Podés editarlos o borrarlos.");

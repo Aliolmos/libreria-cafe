@@ -412,6 +412,8 @@ $("#accGrid").addEventListener("click", e => {
 
 /* ---------- resumen tipo factura ---------- */
 let invoice = null;   // {title, client, period, lines:[{date, desc, qty, unit, amount}], total, paid, file}
+const logoImg = new Image();
+logoImg.src = "logo.png";
 
 function accountInvoice(a, es, total, st){
   openInvoice({
@@ -455,18 +457,26 @@ function drawInvoice(inv){
   c.style.width = W + "px";
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   const F = "'Barlow', Arial, sans-serif", FD = "'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif";
-  const ink = "#16201D", muted = "#5C6B66", line = "#D3DAD7", accent = "#1F5FBF";
+  // Colores del logo de Librería Café
+  const ink = "#2B1520", muted = "#7D5A69", line = "#F2D6E0", accent = "#D81B6A";
   const text = (t, x, y, font, color = ink, align = "left") => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
   const fit = (t, maxW, font) => { ctx.font = font; if (ctx.measureText(t).width <= maxW) return t; while (t.length > 3 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1); return t + "…"; };
 
   ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 8);
+  // Franja de lápices de colores
+  ["#E91E63","#FF7A00","#FFC21A","#43B649","#1E9BE9","#8E44C9"].forEach((col, i, arr) => {
+    ctx.fillStyle = col; ctx.fillRect(i * W / arr.length, 0, W / arr.length + 1, 8);
+  });
 
-  // Comercio
-  let y = 64;
-  text(fit(business.name || "Mi comercio", 430, `700 30px ${FD}`), P, y, `700 30px ${FD}`);
+  // Logo + nombre del comercio
+  const LOGO = 100, lx = P, ly = 26;
+  if (logoImg.complete && logoImg.naturalWidth) ctx.drawImage(logoImg, lx, ly, LOGO, LOGO);
+  else logoImg.onload = () => drawInvoice(inv);
+  const tx = lx + LOGO + 18;
+  let y = 68;
+  text(fit(business.name || "Librería Café", 300, `700 32px ${FD}`), tx, y, `700 32px ${FD}`, accent);
   const info = [business.address, business.phone && "Tel: " + business.phone, business.cuit && "CUIT: " + business.cuit].filter(Boolean);
-  info.forEach((t, i) => text(fit(t, 430, `400 15px ${F}`), P, y + 26 + i * 20, `400 15px ${F}`, muted));
+  info.forEach((t, i) => text(fit(t, 300, `400 15px ${F}`), tx, y + 24 + i * 20, `400 15px ${F}`, muted));
   // Título
   text(inv.title, W - P, y - 4, `700 20px ${FD}`, accent, "right");
   text("Emitido: " + fmtFull(Date.now()), W - P, y + 22, `400 15px ${F}`, muted, "right");
@@ -481,7 +491,7 @@ function drawInvoice(inv){
   // Tabla
   y += 30;
   const cols = {date: P + 10, desc: P + 92, qty: W - P - 270, unit: W - P - 140, amount: W - P - 10};
-  ctx.fillStyle = "#EEF2F0"; ctx.fillRect(P, y, W - 2 * P, ROW);
+  ctx.fillStyle = "#FDE2EE"; ctx.fillRect(P, y, W - 2 * P, ROW);
   const hy = y + 22, hf = `700 13px ${F}`;
   text("FECHA", cols.date, hy, hf, muted);
   text("PRODUCTO / DETALLE", cols.desc, hy, hf, muted);
@@ -490,7 +500,7 @@ function drawInvoice(inv){
   text("SUBTOTAL", cols.amount, hy, hf, muted, "right");
   y += ROW;
   inv.lines.forEach((l, i) => {
-    if (i % 2) { ctx.fillStyle = "#F8FAF9"; ctx.fillRect(P, y, W - 2 * P, ROW); }
+    if (i % 2) { ctx.fillStyle = "#FFF6F8"; ctx.fillRect(P, y, W - 2 * P, ROW); }
     const ty = y + 22, rf = `400 15px ${F}`;
     text(l.date, cols.date, ty, rf, muted);
     text(fit(l.desc, cols.qty - cols.desc - 60, rf), cols.desc, ty, rf);
@@ -504,7 +514,7 @@ function drawInvoice(inv){
   // Total
   y += 52;
   text("TOTAL", W - P - 230, y, `700 18px ${FD}`, muted, "right");
-  text(money(inv.total), W - P - 10, y + 2, `700 34px ${FD}`, ink, "right");
+  text(money(inv.total), W - P - 10, y + 2, `700 34px ${FD}`, accent, "right");
   text(`${inv.lines.length} ítem${inv.lines.length === 1 ? "" : "s"}`, P + 10, y, `400 15px ${F}`, muted);
 
   // Sello de pagado
@@ -524,7 +534,7 @@ function drawInvoice(inv){
 function invoiceText(inv){
   const {money} = S();
   const out = [];
-  out.push(`*${business.name || "Mi comercio"}*`);
+  out.push(`*${business.name || "Librería Café"}*`);
   out.push(`${inv.title === "RESUMEN DE CUENTA" ? "Resumen de cuenta" : "Detalle de deuda"} – ${inv.client}`);
   out.push(inv.period);
   out.push("");

@@ -1,26 +1,31 @@
 
 /* Layout: barra de escaneo arriba (la acción principal), métricas, luego inventario + historial en dos columnas que se apilan en móvil */
+/* Colores tomados del logo de Librería Café: rosa del "CAFE", naranja y amarillo de los lápices */
 :root{
-  --bg:#F3F5F4; --surface:#FFFFFF; --surface-2:#E9EDEB; --line:#D3DAD7;
-  --fg:#17211E; --muted:#5C6B66;
-  --accent:#1F5FBF; --accent-fg:#FFFFFF; --accent-soft:#E2EBF8;
-  --ok:#1C7A4A; --ok-soft:#DDF1E6; --warn:#A35F00; --warn-soft:#FBEBD2; --bad:#B42318; --bad-soft:#FBE1DE;
+  --bg:#FFF6F8; --surface:#FFFFFF; --surface-2:#FDEAF0; --line:#F2D6E0;
+  --fg:#2B1520; --muted:#7D5A69;
+  --accent:#D81B6A; --accent-fg:#FFFFFF; --accent-soft:#FDE2EE;
+  --accent-2:#F58A07; --accent-3:#FFC21A;
+  --ok:#1C7A4A; --ok-soft:#DDF1E6; --warn:#B45A00; --warn-soft:#FFEBD0; --bad:#C62828; --bad-soft:#FDE0DC;
+  --pencils:linear-gradient(90deg,#E91E63 0 16.6%,#FF7A00 16.6% 33.3%,#FFC21A 33.3% 50%,#43B649 50% 66.6%,#1E9BE9 66.6% 83.3%,#8E44C9 83.3%);
   --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
   --r:8px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#111715; --surface:#19211E; --surface-2:#222C29; --line:#2F3B37;
-  --fg:#E6ECEA; --muted:#93A39D;
-  --accent:#6FA3F2; --accent-fg:#0C1424; --accent-soft:#1D2B42;
-  --ok:#5CCB8D; --ok-soft:#173326; --warn:#F0B35A; --warn-soft:#3A2A12; --bad:#F2877C; --bad-soft:#3E1C19;
+  --bg:#1A1116; --surface:#24171E; --surface-2:#2F2028; --line:#3F2B35;
+  --fg:#F8E9EF; --muted:#C2A1B0;
+  --accent:#FF5C9D; --accent-fg:#2A0715; --accent-soft:#45192D;
+  --accent-2:#FFA53D; --accent-3:#FFD45C;
+  --ok:#5CCB8D; --ok-soft:#173326; --warn:#FFB25C; --warn-soft:#3D2810; --bad:#FF8A80; --bad-soft:#431C1A;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#111715; --surface:#19211E; --surface-2:#222C29; --line:#2F3B37;
-  --fg:#E6ECEA; --muted:#93A39D;
-  --accent:#6FA3F2; --accent-fg:#0C1424; --accent-soft:#1D2B42;
-  --ok:#5CCB8D; --ok-soft:#173326; --warn:#F0B35A; --warn-soft:#3A2A12; --bad:#F2877C; --bad-soft:#3E1C19;
+  --bg:#1A1116; --surface:#24171E; --surface-2:#2F2028; --line:#3F2B35;
+  --fg:#F8E9EF; --muted:#C2A1B0;
+  --accent:#FF5C9D; --accent-fg:#2A0715; --accent-soft:#45192D;
+  --accent-2:#FFA53D; --accent-3:#FFD45C;
+  --ok:#5CCB8D; --ok-soft:#173326; --warn:#FFB25C; --warn-soft:#3D2810; --bad:#FF8A80; --bad-soft:#431C1A;
   color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -139,6 +144,17 @@ button,input,select{font:inherit;color:inherit}
 /* Top bar */
 .top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:12px}
+.logo{width:64px;height:64px;border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--accent-soft)}
+.login-card .logo{width:120px;height:120px;justify-self:center}
+.login-card .brand{flex-direction:column;text-align:center}
+.brand .sub{font-size:13px;color:var(--muted);font-weight:500}
+body::before{content:"";display:block;height:6px;background:var(--pencils)}
+h1{color:var(--accent)}
+.metric{border-top:3px solid var(--accent-soft)}
+.metrics .metric:nth-child(4n+1){border-top-color:var(--accent)}
+.metrics .metric:nth-child(4n+2){border-top-color:var(--accent-2)}
+.metrics .metric:nth-child(4n+3){border-top-color:var(--accent-3)}
+.metrics .metric:nth-child(4n+4){border-top-color:#43B649}
 .brand-mark{width:34px;height:34px;border-radius:6px;background:var(--fg);display:grid;place-items:center}
 .brand-mark i{display:block;width:20px;height:16px;background:repeating-linear-gradient(90deg,var(--bg) 0 2px,transparent 2px 3px,var(--bg) 3px 4px,transparent 4px 6px)}
 .status{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}

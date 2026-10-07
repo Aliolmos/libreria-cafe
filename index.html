@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Depósito Stock</title>
+<title>Librería Café · Stock</title>
+<link rel="icon" type="image/png" href="logo.png">
+<meta name="theme-color" content="#D81B6A">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="style.css">
@@ -14,8 +16,8 @@
 <section class="login" id="loginScreen" hidden>
   <div class="login-card">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true"><i></i></div>
-      <h1>Depósito Stock</h1>
+      <img class="logo" src="logo.png" alt="Logo de Librería Café">
+      <div><h1>Librería Café</h1><span class="sub">Sistema de stock y caja</span></div>
     </div>
     <p class="hint">Ingresá con tu cuenta de Gmail.</p>
     <button class="btn google-btn" type="button" id="btnGoogle">
@@ -41,9 +43,9 @@
 <div class="wrap" id="app" hidden>
   <header class="top">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true"><i></i></div>
+      <img class="logo" src="logo.png" alt="Logo de Librería Café">
       <div>
-        <h1>Depósito Stock</h1>
+        <h1>Librería Café</h1>
         <span class="status"><span class="dot" id="statusDot"></span><span id="statusText">Conectando…</span></span>
       </div>
     </div>
@@ -268,7 +270,7 @@
     <div class="dlg-head"><h2 id="dlgProductTitle">Nuevo producto</h2><button class="btn sm" type="button" data-close>Cerrar</button></div>
     <div class="dlg-body">
       <div class="form-grid">
-        <div class="field full"><label class="label" for="fName">Nombre</label><input id="fName" required maxlength="120" placeholder="Ej: Yerba mate 1 kg"><span class="hint" id="nameHint" hidden></span></div>
+        <div class="field full"><label class="label" for="fName">Nombre</label><input id="fName" required maxlength="120" placeholder="Ej: Cuaderno Rivadavia A4 rayado 48 hojas"><span class="hint" id="nameHint" hidden></span></div>
         <div class="field full">
           <label class="label" for="fCode">Código de barras</label>
           <div class="code-row">
@@ -280,7 +282,8 @@
         <div class="field"><label class="label" for="fPrice">Precio unitario</label><input id="fPrice" type="number" min="0" step="0.01" placeholder="0,00"></div>
         <div class="field"><label class="label" for="fQty">Stock actual</label><input id="fQty" type="number" step="1" value="0"></div>
         <div class="field"><label class="label" for="fMin">Stock mínimo (alerta)</label><input id="fMin" type="number" min="0" step="1" value="5"></div>
-        <div class="field"><label class="label" for="fCat">Categoría</label><input id="fCat" maxlength="60" list="catList" placeholder="Ej: Almacén"><datalist id="catList"></datalist></div>
+        <div class="field"><label class="label" for="fCat">Categoría</label><select id="fCat"></select></div>
+        <div class="field"><label class="label" for="fBrand">Marca (opcional)</label><input id="fBrand" maxlength="40" list="brandList" placeholder="Ej: Rivadavia, Bic, Avon, Natura"><datalist id="brandList"></datalist></div>
       </div>
       <div class="err" id="formErr" hidden></div>
     </div>
