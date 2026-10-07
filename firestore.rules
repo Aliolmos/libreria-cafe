@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Propietaria del sistema: ve el panel admin y decide quién tiene acceso.
+    function esAdmin() {
+      return conCuenta() && correo() in ["aliolmos19@gmail.com"];
+    }
+
+    // Cuenta de Google con correo verificado.
+    function conCuenta() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function correo() {
+      return request.auth.token.email.lower();
+    }
+    // Usuarios autorizados: la lista se maneja desde el Panel admin (documento config/access).
+    function esPersonal() {
+      return esAdmin() || (conCuenta()
+        && exists(/databases/$(database)/documents/config/access)
+        && correo() in get(/databases/$(database)/documents/config/access).data.users);
+    }
+
+    match /config/access {
+      allow read: if esPersonal();
+      allow write: if esAdmin();
+    }
+    match /products/{id} {
+      allow read, write: if esPersonal();
+    }
+    // Historial: cada movimiento queda firmado con el correo de quien lo hizo y no se puede editar.
+    match /moves/{id} {
+      allow read: if esPersonal();
+      allow create: if esPersonal() && request.resource.data.by == correo();
+      allow update, delete: if false;
+    }
+    // Último ingreso de cada usuario (lo ve la admin).
+    match /sessions/{uid} {
+      allow read: if esAdmin() || (esPersonal() && request.auth.uid == uid);
+      allow write: if esPersonal() && request.auth.uid == uid;
+    }
+    // Intentos de ingreso de cuentas sin permiso.
+    match /denied/{uid} {
+      allow read, delete: if esAdmin();
+      allow create, update: if conCuenta() && request.auth.uid == uid
+        && request.resource.data.email == correo();
+    }
+    // Errores que ocurren en los dispositivos de los usuarios.
+    match /errors/{id} {
+      allow read, delete: if esAdmin();
+      allow create: if esPersonal();
+    }
+  }
+}
