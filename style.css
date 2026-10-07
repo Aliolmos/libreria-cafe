@@ -1,10 +1,11 @@
 
 /* Layout: barra de escaneo arriba (la acción principal), métricas, luego inventario + historial en dos columnas que se apilan en móvil */
-/* Colores tomados del logo de Librería Café: rosa del "CAFE", naranja y amarillo de los lápices */
+/* Base neutra; los colores de los lápices del logo (azul, naranja, amarillo, verde) solo como acentos.
+   El rosa queda para el logo y la factura. */
 :root{
-  --bg:#FFF6F8; --surface:#FFFFFF; --surface-2:#FDEAF0; --line:#F2D6E0;
-  --fg:#2B1520; --muted:#7D5A69;
-  --accent:#D81B6A; --accent-fg:#FFFFFF; --accent-soft:#FDE2EE;
+  --bg:#F5F6F7; --surface:#FFFFFF; --surface-2:#ECEEF1; --line:#DCE0E5;
+  --fg:#1C2128; --muted:#5D6672;
+  --accent:#1A73C8; --accent-fg:#FFFFFF; --accent-soft:#E3EFFB;
   --accent-2:#F58A07; --accent-3:#FFC21A;
   --ok:#1C7A4A; --ok-soft:#DDF1E6; --warn:#B45A00; --warn-soft:#FFEBD0; --bad:#C62828; --bad-soft:#FDE0DC;
   --pencils:linear-gradient(90deg,#E91E63 0 16.6%,#FF7A00 16.6% 33.3%,#FFC21A 33.3% 50%,#43B649 50% 66.6%,#1E9BE9 66.6% 83.3%,#8E44C9 83.3%);
@@ -14,16 +15,16 @@
   --r:8px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#1A1116; --surface:#24171E; --surface-2:#2F2028; --line:#3F2B35;
-  --fg:#F8E9EF; --muted:#C2A1B0;
-  --accent:#FF5C9D; --accent-fg:#2A0715; --accent-soft:#45192D;
+  --bg:#14171B; --surface:#1C2026; --surface-2:#252A31; --line:#323840;
+  --fg:#E8ECF0; --muted:#9AA4AF;
+  --accent:#5AA9F2; --accent-fg:#0B1A2A; --accent-soft:#1B2D42;
   --accent-2:#FFA53D; --accent-3:#FFD45C;
   --ok:#5CCB8D; --ok-soft:#173326; --warn:#FFB25C; --warn-soft:#3D2810; --bad:#FF8A80; --bad-soft:#431C1A;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#1A1116; --surface:#24171E; --surface-2:#2F2028; --line:#3F2B35;
-  --fg:#F8E9EF; --muted:#C2A1B0;
-  --accent:#FF5C9D; --accent-fg:#2A0715; --accent-soft:#45192D;
+  --bg:#14171B; --surface:#1C2026; --surface-2:#252A31; --line:#323840;
+  --fg:#E8ECF0; --muted:#9AA4AF;
+  --accent:#5AA9F2; --accent-fg:#0B1A2A; --accent-soft:#1B2D42;
   --accent-2:#FFA53D; --accent-3:#FFD45C;
   --ok:#5CCB8D; --ok-soft:#173326; --warn:#FFB25C; --warn-soft:#3D2810; --bad:#FF8A80; --bad-soft:#431C1A;
   color-scheme:dark}
@@ -144,12 +145,12 @@ button,input,select{font:inherit;color:inherit}
 /* Top bar */
 .top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:12px}
-.logo{width:64px;height:64px;border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--accent-soft)}
+.logo{width:64px;height:64px;border-radius:50%;flex:none;box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--line)}
 .login-card .logo{width:120px;height:120px;justify-self:center}
 .login-card .brand{flex-direction:column;text-align:center}
 .brand .sub{font-size:13px;color:var(--muted);font-weight:500}
 body::before{content:"";display:block;height:6px;background:var(--pencils)}
-h1{color:var(--accent)}
+h1{color:var(--fg)}
 .metric{border-top:3px solid var(--accent-soft)}
 .metrics .metric:nth-child(4n+1){border-top-color:var(--accent)}
 .metrics .metric:nth-child(4n+2){border-top-color:var(--accent-2)}

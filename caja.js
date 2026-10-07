@@ -457,7 +457,7 @@ function drawInvoice(inv){
   c.style.width = W + "px";
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   const F = "'Barlow', Arial, sans-serif", FD = "'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif";
-  // Colores del logo de Librería Café
+  // Colores del logo de Librería Cafe
   const ink = "#2B1520", muted = "#7D5A69", line = "#F2D6E0", accent = "#D81B6A";
   const text = (t, x, y, font, color = ink, align = "left") => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(t, x, y); };
   const fit = (t, maxW, font) => { ctx.font = font; if (ctx.measureText(t).width <= maxW) return t; while (t.length > 3 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1); return t + "…"; };
@@ -474,7 +474,7 @@ function drawInvoice(inv){
   else logoImg.onload = () => drawInvoice(inv);
   const tx = lx + LOGO + 18;
   let y = 68;
-  text(fit(business.name || "Librería Café", 300, `700 32px ${FD}`), tx, y, `700 32px ${FD}`, accent);
+  text(fit(business.name || "Librería Cafe", 300, `700 32px ${FD}`), tx, y, `700 32px ${FD}`, accent);
   const info = [business.address, business.phone && "Tel: " + business.phone, business.cuit && "CUIT: " + business.cuit].filter(Boolean);
   info.forEach((t, i) => text(fit(t, 300, `400 15px ${F}`), tx, y + 24 + i * 20, `400 15px ${F}`, muted));
   // Título
@@ -534,7 +534,7 @@ function drawInvoice(inv){
 function invoiceText(inv){
   const {money} = S();
   const out = [];
-  out.push(`*${business.name || "Librería Café"}*`);
+  out.push(`*${business.name || "Librería Cafe"}*`);
   out.push(`${inv.title === "RESUMEN DE CUENTA" ? "Resumen de cuenta" : "Detalle de deuda"} – ${inv.client}`);
   out.push(inv.period);
   out.push("");
