@@ -462,30 +462,49 @@ function openProduct(code, newCode, newName){
   if (!p && newCode) lookupName(newCode);
 }
 
-// Busca el nombre del producto en Open Food Facts (base pública y gratuita de productos con código de barras).
+// Busca el nombre del producto en bases públicas y gratuitas de códigos de barras.
+// Ninguna cubre todos los artículos de librería: si no aparece, se escribe una vez
+// y queda guardado para siempre en todos los dispositivos.
+async function getJSON(url, ms = 6000){
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), ms);
+  try { const r = await fetch(url, {signal:ctrl.signal}); return r.ok ? await r.json() : null; }
+  catch(e){ return null; }
+  finally { clearTimeout(t); }
+}
+const offName = d => {
+  if (!d || d.status !== 1 || !d.product) return "";
+  const pr = d.product;
+  return [pr.product_name_es || pr.product_name, pr.brands && pr.brands.split(",")[0], pr.quantity].filter(Boolean).join(" ").trim();
+};
+const NAME_SOURCES = [
+  // Libros: los ISBN empiezan con 978 o 979.
+  {label:"Open Library", isbn:true, find: async c => {
+    const d = await getJSON(`https://openlibrary.org/api/books?bibkeys=ISBN:${c}&format=json&jscmd=data`);
+    const b = d && d["ISBN:" + c];
+    return b ? [b.title, b.authors && b.authors[0] && "– " + b.authors[0].name].filter(Boolean).join(" ") : "";
+  }},
+  {label:"Open Products Facts", find: async c => offName(await getJSON(`https://world.openproductsfacts.org/api/v2/product/${c}.json?fields=product_name,product_name_es,brands,quantity`))},
+  {label:"Open Food Facts", find: async c => offName(await getJSON(`https://world.openfoodfacts.org/api/v2/product/${c}.json?fields=product_name,product_name_es,brands,quantity`))}
+];
 let lookupSeq = 0;
 async function lookupName(code){
   if (!/^\d{8,14}$/.test(code) || /^2\d/.test(code)) return;   // los códigos internos (20…) no están en ninguna base
   const seq = ++lookupSeq, hint = $("#nameHint");
   hint.hidden = false; hint.textContent = "Buscando el nombre del producto…";
-  let name = "";
-  try {
-    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 5000);
-    const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_es,brands,quantity`, {signal:ctrl.signal});
-    clearTimeout(t);
-    const d = await r.json();
-    if (d && d.status === 1 && d.product) {
-      const pr = d.product;
-      name = [pr.product_name_es || pr.product_name, pr.brands && pr.brands.split(",")[0], pr.quantity].filter(Boolean).join(" ").trim();
-    }
-  } catch(e){}
+  const isbn = /^97[89]\d{10}$/.test(code);
+  const sources = NAME_SOURCES.filter(s => !s.isbn || isbn);
+  // Todas a la vez; gana la primera de la lista que tenga el producto.
+  const results = await Promise.all(sources.map(s => s.find(code).catch(() => "")));
+  const i = results.findIndex(Boolean);
+  const name = i >= 0 ? results[i] : "";
   if (seq !== lookupSeq || !dlgP.open || $("#fCode").value.trim() !== code) return;
   if (name && !$("#fName").value.trim()) {
     $("#fName").value = name;
-    hint.textContent = "Nombre encontrado automáticamente. Podés corregirlo.";
+    hint.textContent = `Nombre encontrado en ${sources[i].label}. Revisalo y corregilo si hace falta.`;
     $("#fPrice").focus();
   } else if (!name) {
-    hint.textContent = "No se encontró el nombre de este código. Escribilo a mano.";
+    hint.textContent = "Este código no está en las bases públicas. Escribí el nombre una sola vez: queda guardado y la próxima vez que lo escanees aparece solo.";
+    if (!$("#fName").value.trim()) $("#fName").focus();
   } else hint.hidden = true;
 }
 function generateCode(){
