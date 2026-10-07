@@ -246,6 +246,29 @@
         <ul class="plain-list" id="errorList"><li class="empty">Sin errores registrados. Todo funciona bien.</li></ul>
       </section>
 
+      <section class="panel wide" aria-label="Borrar datos de prueba">
+        <div class="panel-head">
+          <div><h2>Borrar datos de prueba</h2><span class="meta">Para limpiar la caja después de probar o enseñar el sistema. Lo que se borra no se puede recuperar.</span></div>
+        </div>
+        <form class="cleanup" id="cleanupForm" novalidate>
+          <label class="check"><input type="checkbox" id="clDaySales" checked> Ventas y cobros del día <input type="date" id="clDay" aria-label="Día a borrar"></label>
+          <label class="check"><input type="checkbox" id="clAllSales"> Toda la caja (ventas y cobros de todos los días)</label>
+          <label class="check"><input type="checkbox" id="clDebts"> Todas las deudas (fiado), pendientes y pagadas</label>
+          <label class="check"><input type="checkbox" id="clAccounts"> Todas las cuentas mensuales, con sus retiros y pagos</label>
+          <label class="check sub-check"><input type="checkbox" id="clRestock" checked> Devolver al stock los productos de esos retiros</label>
+          <div class="cleanup-actions">
+            <button class="btn danger" type="submit" id="btnCleanup">Revisar qué se va a borrar</button>
+          </div>
+          <div class="cleanup-confirm" id="cleanupConfirm" hidden>
+            <p id="cleanupSummary"></p>
+            <div class="row-actions">
+              <button class="btn danger armed" type="button" id="btnCleanupOk">Sí, borrar todo esto</button>
+              <button class="btn" type="button" id="btnCleanupCancel">Cancelar</button>
+            </div>
+          </div>
+        </form>
+      </section>
+
       <section class="panel wide" aria-label="Historial completo">
         <div class="panel-head">
           <h2>Historial de movimientos</h2>

@@ -122,7 +122,7 @@ function renderSales(){
   el.innerHTML = sales.map(s => `<li data-id="${esc(s.id)}">
     <div class="row"><span><span class="meta">${hhmm(s.ts)}</span> ${esc(s.note || KINDS[s.kind] || "Venta")}</span><b class="num">${money(s.amount)}</b></div>
     <div class="row"><span class="meta">${METHODS[s.method] || esc(s.method)}${s.kind && s.kind !== "venta" ? " · " + KINDS[s.kind] : ""} · ${esc(s.byName || s.by || "")}</span>
-      ${s.kind === "venta" || !s.kind ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
+      ${s.kind === "venta" || !s.kind || S().me.isAdmin ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
   </li>`).join("");
 }
 $("#saleForm").addEventListener("submit", e => {
@@ -135,11 +135,35 @@ $("#saleForm").addEventListener("submit", e => {
   }));
   $("#sAmount").value = ""; $("#sNote").value = ""; $("#sAmount").focus();
 });
-$("#salesList").addEventListener("click", e => {
+$("#salesList").addEventListener("click", async e => {
   const b = e.target.closest("[data-act='del-sale']"); if (!b) return;
-  if (!confirmTwice(b, "¿Borrar?")) return;
-  fire(S().fs.doc("sales/" + b.closest("li").dataset.id).delete());
+  const s = sales.find(x => x.id === b.closest("li").dataset.id); if (!s) return;
+  if (!confirmTwice(b, s.kind && s.kind !== "venta" ? "¿Borrar y deshacer el cobro?" : "¿Borrar?")) return;
+  try { await undoSale(s.id, s); S().toast(s.kind === "cobro-deuda" ? "Cobro borrado. La deuda vuelve a figurar como pendiente." : s.kind === "cuenta" ? "Cobro borrado. La cuenta vuelve a figurar sin pagar." : "Venta borrada"); }
+  catch(ex){ S().toast("No se pudo borrar (" + (ex.code || "error") + ")."); }
 });
+
+// Borra una venta o cobro y deshace lo que ese cobro había marcado:
+// un cobro de deuda vuelve a dejar la deuda pendiente; el pago de una cuenta mensual la deja sin pagar.
+async function undoSale(id, s){
+  const {fs} = S();
+  const batch = fs.batch();
+  batch.delete(fs.doc("sales/" + id));
+  if (s.kind === "cobro-deuda" && s.debtId) {
+    const d = await fs.doc("debts/" + s.debtId).get();
+    if (d.exists) {
+      const pay = (d.data().payments || []).find(p => p.saleId === id);
+      const upd = {paid: false, paidAt: FV().delete(), paidBy: FV().delete(), paidAmount: FV().increment(-(+s.amount || 0))};
+      if (pay) upd.payments = FV().arrayRemove(pay);
+      batch.update(d.ref, upd);
+    }
+  }
+  if (s.kind === "cuenta") {
+    const m = await fs.collection("accountMonths").where("saleId", "==", id).get();
+    m.docs.forEach(doc => batch.delete(doc.ref));
+  }
+  await batch.commit();
+}
 
 /* ---------- deudas (fiado) ---------- */
 function renderDebts(){
@@ -570,5 +594,5 @@ $("#invShare").addEventListener("click", () => {
   }, "image/png");
 });
 
-window.Caja = {start, stop};
+window.Caja = {start, stop, undoSale};
 })();

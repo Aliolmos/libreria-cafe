@@ -158,5 +158,96 @@ $("#movesUser").addEventListener("change", renderMoves);
 window.addEventListener("online", renderHealth);
 window.addEventListener("offline", renderHealth);
 
+/* ---------- borrar datos de prueba ---------- */
+const pad2 = n => String(n).padStart(2, "0");
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+$("#clDay").value = todayKey();
+let cleanupPlan = null;
+
+// "Toda la caja" ya incluye el día: no tiene sentido marcar las dos.
+$("#clAllSales").addEventListener("change", () => { if ($("#clAllSales").checked) $("#clDaySales").checked = false; resetCleanup(); });
+$("#clDaySales").addEventListener("change", () => { if ($("#clDaySales").checked) $("#clAllSales").checked = false; resetCleanup(); });
+["#clDay","#clDebts","#clAccounts","#clRestock"].forEach(s => $(s).addEventListener("change", resetCleanup));
+function resetCleanup(){ cleanupPlan = null; $("#cleanupConfirm").hidden = true; $("#btnCleanup").disabled = false; }
+
+$("#cleanupForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const {fs, money} = S();
+  const opt = {
+    day: $("#clDaySales").checked ? $("#clDay").value : null,
+    allSales: $("#clAllSales").checked,
+    debts: $("#clDebts").checked,
+    accounts: $("#clAccounts").checked,
+    restock: $("#clRestock").checked
+  };
+  if (!opt.day && !opt.allSales && !opt.debts && !opt.accounts) { S().toast("Marcá qué querés borrar."); return; }
+  const btn = $("#btnCleanup"); btn.disabled = true; btn.textContent = "Revisando…";
+  try {
+    const get = async q => (await q.get()).docs;
+    const plan = {opt, sales: [], debts: [], accounts: [], entries: [], months: []};
+    if (opt.allSales) plan.sales = await get(fs.collection("sales"));
+    else if (opt.day) plan.sales = await get(fs.collection("sales").where("day", "==", opt.day));
+    if (opt.debts) plan.debts = await get(fs.collection("debts"));
+    if (opt.accounts) {
+      [plan.accounts, plan.entries, plan.months] = await Promise.all([
+        get(fs.collection("accounts")), get(fs.collection("accountEntries")), get(fs.collection("accountMonths"))
+      ]);
+    }
+    cleanupPlan = plan;
+    const total = plan.sales.reduce((s, d) => s + (+d.data().amount || 0), 0);
+    const [y, m, d] = (opt.day || "--").split("-");
+    const parts = [];
+    if (opt.allSales || opt.day) parts.push(`<b>${plan.sales.length}</b> venta(s) y cobro(s) ${opt.allSales ? "de toda la caja" : `del ${d}/${m}/${y}`} (${money(total)})`);
+    if (opt.debts) parts.push(`<b>${plan.debts.length}</b> deuda(s)`);
+    if (opt.accounts) parts.push(`<b>${plan.accounts.length}</b> cuenta(s) mensual(es) con <b>${plan.entries.length}</b> retiro(s)${opt.restock ? " (los productos vuelven al stock)" : ""}`);
+    const empty = !plan.sales.length && !plan.debts.length && !plan.accounts.length && !plan.entries.length && !plan.months.length;
+    $("#cleanupSummary").innerHTML = empty
+      ? "No hay nada para borrar con lo que marcaste."
+      : "Se van a borrar: " + parts.join(", ") + ". <b>Esto no se puede deshacer.</b>";
+    $("#btnCleanupOk").hidden = empty;
+    $("#cleanupConfirm").hidden = false;
+  } catch(ex){
+    S().toast("No se pudo revisar (" + (ex.code || "error") + ").");
+    btn.disabled = false;
+  }
+  btn.textContent = "Revisar qué se va a borrar";
+});
+$("#btnCleanupCancel").addEventListener("click", resetCleanup);
+
+$("#btnCleanupOk").addEventListener("click", async () => {
+  const plan = cleanupPlan; if (!plan) return;
+  const {fs} = S();
+  const ok = $("#btnCleanupOk"); ok.disabled = true; ok.textContent = "Borrando…";
+  try {
+    // Cobros que quedan "sueltos": si no se borran sus deudas o cuentas, deshacer lo que marcaron.
+    for (const s of plan.sales) {
+      const data = s.data();
+      const keepsDebt = data.kind === "cobro-deuda" && !plan.opt.debts;
+      const keepsAccount = data.kind === "cuenta" && !plan.opt.accounts;
+      if (keepsDebt || keepsAccount) await window.Caja.undoSale(s.id, data);
+    }
+    // Devolver al stock lo que se llevaron las cuentas (antes de borrar los retiros).
+    if (plan.opt.restock) {
+      for (const en of plan.entries) {
+        const e = en.data();
+        if (e.code && S().products.has(e.code)) await S().changeStock(e.code, +e.qty || 0, "cuenta");
+      }
+    }
+    // Borrar todo en tandas (Firestore admite hasta 500 operaciones por tanda).
+    const refs = [...plan.sales, ...plan.debts, ...plan.accounts, ...plan.entries, ...plan.months].map(d => d.ref);
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = fs.batch();
+      refs.slice(i, i + 400).forEach(r => batch.delete(r));
+      await batch.commit();
+    }
+    S().toast(`Listo: se borraron ${refs.length} registro(s) de prueba.`);
+    resetCleanup();
+  } catch(ex){
+    S().toast("Se cortó a mitad de camino (" + (ex.code || "error") + "). Volvé a revisar y borrar lo que quedó.");
+    resetCleanup();
+  }
+  ok.disabled = false; ok.textContent = "Sí, borrar todo esto";
+});
+
 window.AdminPanel = {start, stop};
 })();
