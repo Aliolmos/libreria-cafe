@@ -444,7 +444,7 @@ document.addEventListener("keydown", e => {
 });
 
 const MODE_HINTS = {
-  sell: "Venta: escaneá o buscá cada producto que se llevan, elegí cómo pagó y confirmá. Se descuenta del stock y se suma a la Caja del día.",
+  sell: "Venta: escaneá o buscá cada producto que se llevan y confirmá. Se descuenta del stock y se suma a la Caja del día.",
   in: "Entrada: cada escaneo suma al stock (mercadería que llegó).",
   look: "Consultar: muestra el stock y el precio sin cambiar nada."
 };

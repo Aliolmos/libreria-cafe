@@ -169,7 +169,9 @@ html,body{margin:0}
 
 /* Borrar datos de prueba */
 .cleanup{display:grid;gap:10px;padding:14px 16px}
-.check{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14.5px;cursor:pointer}
+.check{display:flex;flex-wrap:nowrap;align-items:flex-start;gap:8px;font-size:14.5px;line-height:1.4;cursor:pointer}
+.check:has(input[type="date"]){flex-wrap:wrap;align-items:center}
+.check input[type="checkbox"]{flex:none;margin:2px 0 0}
 .check input[type="checkbox"]{width:17px;height:17px;accent-color:var(--bad)}
 .check input[type="date"]{padding:5px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
 .sub-check{padding-left:26px;color:var(--muted)}
@@ -353,3 +355,145 @@ dialog::backdrop{background:rgba(10,16,14,.5)}
   .scan-field input{font-size:18px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* =========================================================
+   Celular (hasta 700px): cabecera compacta, barra de navegación abajo,
+   tarjetas de producto y ventanas a pantalla completa.
+   ========================================================= */
+.plus{font-weight:700;font-size:1.1em;line-height:1}
+@media (max-width:700px){
+  body{font-size:15px}
+  /* iPhone hace zoom solo si la letra de un campo es menor a 16px */
+  input,select,textarea{font-size:16px!important}
+  .wrap{padding-inline:12px;padding-block:10px calc(84px + env(safe-area-inset-bottom,0px));gap:12px}
+  .view{gap:12px}
+
+  /* Cabecera: logo, nombre, + y Salir en una sola línea */
+  .top{flex-wrap:nowrap;gap:10px}
+  .top .brand{min-width:0;flex:1;gap:10px}
+  .top .brand > div{min-width:0}
+  .top .logo{width:44px;height:44px;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--line)}
+  .top h1{font-size:21px;line-height:1.1}
+  .status{font-size:12px;max-width:100%}
+  .status span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .top-actions{flex-wrap:nowrap;gap:6px;flex:none}
+  #btnExport,#btnImport,.user-chip{display:none}
+  #btnNew{width:42px;height:42px;padding:0;justify-content:center;border-radius:50%}
+  #btnNew .btn-txt{display:none}
+  #btnNew .plus{font-size:24px}
+  #btnLogout{height:42px;padding:0 12px}
+
+  /* Pestañas: barra fija abajo, como una app */
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-bottom:0;border-top:1px solid var(--line);
+        padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));gap:6px;box-shadow:0 -4px 18px rgba(0,0,0,.08)}
+  .tabs button{flex:1;justify-content:center;padding:12px 6px;border:0;margin:0;border-radius:10px;font-size:15px}
+  .tabs button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+  .toast-host{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+
+  /* Estación de escaneo */
+  .station{padding:12px;gap:12px;border-radius:12px}
+  .scan-col{gap:10px}
+  .scan-col > .label{display:none}
+  .scan-field input{font-size:17px!important;padding:12px 12px 12px 44px;letter-spacing:.02em}
+  .scan-field .beam{left:12px;width:22px}
+  .seg button{padding:11px 6px;font-size:16px}
+  .controls{display:grid;grid-template-columns:auto 1fr;gap:8px}
+  .controls .seg{grid-column:1/-1}
+  #btnCamera{grid-column:1/-1;order:1;justify-content:center;padding:12px;font-size:16px;background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .controls .qty-field{order:2}
+  #btnManual{order:3}
+  .qty-field{gap:6px}
+  .qty-field input{width:60px;padding:9px 6px}
+  #btnManual{justify-content:center;padding:10px 8px}
+  .armed-hint{display:none}
+  .cart{padding:12px;gap:8px}
+  .cart-items{max-height:none}
+  .cart-total b{font-size:26px}
+  .cart-confirm{padding:14px;font-size:17px}
+  .result{min-height:0;padding:12px}
+  .result .r-big{font-size:34px}
+
+  /* Resúmenes */
+  .metrics{gap:8px}
+  .metric{padding:10px 12px}
+  .metric .v{font-size:21px}
+  .metric .label{font-size:10.5px}
+
+  /* Paneles */
+  .panel{border-radius:12px}
+  .panel-head{padding:12px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;width:100%;gap:8px}
+  .filters input{grid-column:1/-1;width:100%}
+  .filters select{width:100%;min-width:0}
+  .history{max-height:320px}
+  .history li{padding:8px 12px}
+
+  /* Productos como tarjetas compactas */
+  #rows tr{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name name" "code price" "stock val" "act act";gap:6px 10px;padding:12px}
+  #rows td.c-name{grid-area:name}
+  #rows td.c-code{grid-area:code;align-self:center}
+  #rows td.c-price{grid-area:price;text-align:right;align-self:center;font-weight:600;font-size:15px}
+  #rows td.c-stock{grid-area:stock}
+  #rows td.c-val{grid-area:val;text-align:right;align-self:center;color:var(--muted)}
+  #rows td.c-act{grid-area:act}
+  #rows .row-actions{justify-content:stretch}
+  #rows .row-actions .btn{flex:1;justify-content:center;padding:8px}
+  .stock-cell .icon-btn{width:38px;height:38px}
+  .p-name{font-size:15.5px;line-height:1.25}
+
+  /* Caja */
+  .caja-bar{gap:8px}
+  .caja-bar .field.inline{flex:1}
+  .caja-bar .field.inline input{width:100%}
+  #cToday{height:42px}
+  .main-metric .v{font-size:30px}
+  .caja-metrics{grid-template-columns:1fr}
+  .caja-metrics .metric.alert{grid-template-columns:1fr auto;align-items:baseline}
+  .caja-metrics .metric.alert .label{grid-column:1/-1}
+  .caja-form{padding:12px;gap:8px}
+  .caja-form > input,.caja-form > select,.caja-form .grow{flex:1 1 100%;width:100%}
+  .caja-form input[type="number"]{width:100%;flex:1 1 100%}
+  .caja-form > .btn{flex:1 1 100%;justify-content:center;padding:12px;font-size:16px}
+  .sale-scan input{padding:12px}
+  .toggle{width:100%}
+  .toggle button{flex:1;padding:9px}
+  .plain-list li{padding:10px 12px}
+  .debt-group .row{align-items:flex-start}
+  .pay-inputs{width:100%}
+  .pay-inputs input{flex:1;width:auto}
+  .acc-grid{padding:12px;gap:12px}
+  .acc-card header{padding:12px}
+  .entry-form{padding:10px 12px}
+  .entry-form .grow{flex:1 1 100%}
+  .entry-form input[name="qty"]{width:70px}
+  .entry-form input[name="price"]{flex:1;width:auto}
+  .acc-card footer{padding:10px 12px}
+  .acc-card footer .btn{flex:1 1 auto;justify-content:center}
+  .inv-table td{padding:6px 8px;font-size:13.5px}
+  .inv-table td.t{white-space:nowrap}
+
+  /* Panel admin */
+  .admin-table tbody tr{grid-template-columns:minmax(0,1fr) auto;padding:12px;gap:4px 10px}
+  #userRows td:nth-child(4){text-align:left;color:var(--muted)}
+  #userRows td:nth-child(4)::after{content:" movimientos hoy"}
+  #userRows td:nth-child(5){align-self:center}
+  .admin-table td:first-child{grid-column:1/-1}
+  .admin-table td{font-size:13.5px}
+  .cleanup{padding:12px}
+
+  /* Ventanas: hoja que sube desde abajo, ocupando la pantalla */
+  dialog{width:100%;max-width:100%;margin:auto 0 0;border-radius:16px 16px 0 0;border-bottom:0;max-height:94dvh}
+  .dlg-head{padding:14px 16px;position:sticky;top:0;background:var(--surface);z-index:2}
+  .dlg-body{padding:14px 16px}
+  .dlg-foot{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));position:sticky;bottom:0;background:var(--surface)}
+  .dlg-foot .right{width:100%;margin-left:0}
+  .dlg-foot .right .btn,.dlg-foot > .btn{flex:1;justify-content:center;padding:12px}
+  .dlg-foot{flex-direction:column-reverse}
+  .dlg-foot > #btnDelete{width:100%;justify-content:center}
+  .code-row{flex-wrap:wrap}
+  .code-row input{flex:1 1 100%}
+  .code-row .btn{flex:1;justify-content:center;padding:10px}
+  .field input,.field select{padding:11px 12px}
+  .cam-view{min-height:260px}
+  .wide-dialog,.cam-dialog{width:100%}
+}

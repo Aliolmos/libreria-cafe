@@ -53,7 +53,7 @@
       <button class="btn" id="btnExport" type="button">Exportar respaldo</button>
       <label class="btn" for="importFile" id="btnImport">Importar respaldo</label>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
-      <button class="btn primary" id="btnNew" type="button">+ Nuevo producto</button>
+      <button class="btn primary" id="btnNew" type="button" aria-label="Nuevo producto"><span class="plus" aria-hidden="true">+</span><span class="btn-txt">Nuevo producto</span></button>
       <span class="user-chip"><img id="userPhoto" alt="" referrerpolicy="no-referrer" hidden><span id="userName"></span></span>
       <button class="btn" id="btnLogout" type="button" title="Cerrar sesión">Salir</button>
     </div>
@@ -168,7 +168,7 @@
         <div class="panel-head"><h2>Ventas del día</h2></div>
         <form class="caja-form sale-form" id="saleForm" novalidate>
           <div class="sale-scan">
-            <input id="sScan" class="grow" autocomplete="off" spellcheck="false" placeholder="Escaneá el producto (lector o cámara)" aria-label="Escanear producto">
+            <input id="sScan" class="grow" autocomplete="off" spellcheck="false" placeholder="Escaneá un producto" aria-label="Escanear producto">
             <button class="btn cam-btn" type="button" id="sCamera">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
               Cámara
