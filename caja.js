@@ -99,7 +99,7 @@ $("#cMonth").addEventListener("change", () => { if ($("#cMonth").value) { month 
 function renderTotals(){
   const {money} = S();
   const sum = f => round2(sales.filter(f).reduce((a, s) => a + (+s.amount || 0), 0));
-  $("#cTotalLabel").textContent = day === dayKey() ? "Total de hoy" : "Total del " + fmtDay(day);
+  $("#cTotalLabel").textContent = day === dayKey() ? "Dinero en caja" : "Dinero en caja del " + fmtDay(day);
   $("#cTotal").textContent = money(sum(() => true));
   $("#cOwed").textContent = money(round2(pending.reduce((a, d) => a + rem(d), 0)));
   const people = new Set(pending.map(d => d.name.trim().toLowerCase())).size;
@@ -121,15 +121,93 @@ function renderSales(){
       ${s.kind === "venta" || !s.kind || S().me.isAdmin ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
   </li>`).join("");
 }
+/* Venta desde la Caja: escaneando productos (se descuentan del stock) o poniendo solo el monto. */
+const ticket = new Map();       // código -> cantidad
+let amountEdited = false;       // si escribieron el monto a mano, no pisarlo con la suma
+
+function findByCodeOrName(text){
+  const t = String(text || "").trim(); if (!t) return null;
+  const products = S().products;
+  if (products.has(t)) return products.get(t);
+  // Algunos lectores leen como UPC-A (12 dígitos) un EAN-13 que empieza con 0.
+  if (/^\d{12}$/.test(t) && products.has("0" + t)) return products.get("0" + t);
+  const low = t.toLowerCase();
+  for (const p of products.values()) if (p.name.toLowerCase() === low) return p;
+  return null;
+}
+function scan(raw){
+  const code = String(raw || "").trim(); if (!code) return;
+  const p = findByCodeOrName(code);
+  if (p) {
+    ticket.set(p.code, (ticket.get(p.code) || 0) + 1);
+    renderTicket(p.code);
+    S().beep(880);
+    return;
+  }
+  // Código que no está cargado: alta rápida (el nombre es opcional) y va directo a esta venta.
+  S().beep(330);
+  S().openProduct(null, code, "", newCode => {
+    ticket.set(newCode, (ticket.get(newCode) || 0) + 1);
+    renderTicket(newCode);
+  });
+}
+function renderTicket(justAdded){
+  const {esc, money, int} = S();
+  const lines = S().linesFrom(ticket);
+  const el = $("#sItems");
+  el.hidden = !lines.length;
+  el.innerHTML = lines.map(l => `
+    <li data-code="${esc(l.code)}"${l.code === justAdded ? ' class="just"' : ""}>
+      <div class="ci-name"><b>${esc(l.name)}</b><span class="meta">${money(l.unitPrice)} c/u${l.qty > l.stock ? ` · <span class="warn-text">quedan ${int(l.stock)} en stock</span>` : ""}</span></div>
+      <span class="stock-cell">
+        <button class="btn icon-btn" type="button" data-t="dec" aria-label="Uno menos">−</button>
+        <span class="q">${int(l.qty)}</span>
+        <button class="btn icon-btn" type="button" data-t="inc" aria-label="Uno más">+</button>
+      </span>
+      <b class="num ci-sub">${money(l.amount)}</b>
+      <button class="link-btn" type="button" data-t="del" aria-label="Sacar">✕</button>
+    </li>`).join("");
+  if (!amountEdited) {
+    const sum = round2(lines.reduce((s, l) => s + l.amount, 0));
+    $("#sAmount").value = lines.length ? sum : "";
+  }
+}
+$("#sScan").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = $("#sScan").value; $("#sScan").value = "";
+  if (v.trim()) scan(v);
+  else if (ticket.size || $("#sAmount").value) $("#saleForm").requestSubmit();   // Enter vacío: cobrar
+});
+$("#sCamera").addEventListener("click", () => S().openCamera("callback", scan));
+$("#sAmount").addEventListener("input", () => { amountEdited = $("#sAmount").value !== ""; });
+$("#sItems").addEventListener("click", e => {
+  const b = e.target.closest("[data-t]"); if (!b) return;
+  const code = b.closest("li").dataset.code;
+  const q = ticket.get(code) || 0;
+  if (b.dataset.t === "inc") ticket.set(code, q + 1);
+  else if (b.dataset.t === "dec") q > 1 ? ticket.set(code, q - 1) : ticket.delete(code);
+  else ticket.delete(code);
+  renderTicket();
+});
 $("#saleForm").addEventListener("submit", e => {
   e.preventDefault();
-  const amount = parseMoney($("#sAmount").value);
-  if (!(amount > 0)) { S().toast("Escribí el monto de la venta."); $("#sAmount").focus(); return; }
-  fire(S().fs.collection("sales").doc().set({
-    amount, note: $("#sNote").value.trim(),
-    kind: "venta", day, ts: Date.now(), ...who()
-  }));
-  $("#sAmount").value = ""; $("#sNote").value = ""; $("#sAmount").focus();
+  const lines = S().linesFrom(ticket);
+  const typed = parseMoney($("#sAmount").value);
+  const note = $("#sNote").value.trim();
+  if (lines.length) {
+    // Con productos: descuenta stock y suma la venta. El monto puede corregirse a mano.
+    const amount = typed >= 0 ? typed : undefined;
+    S().registerSale(lines, {amount, note, day});
+  } else {
+    if (!(typed > 0)) { S().toast("Escaneá un producto o escribí el monto."); $("#sScan").focus(); return; }
+    fire(S().fs.collection("sales").doc().set({amount: typed, note, kind: "venta", day, ts: Date.now(), ...who()}));
+  }
+  S().toast("Venta agregada: " + S().money(lines.length && !(typed >= 0) ? round2(lines.reduce((s, l) => s + l.amount, 0)) : typed));
+  ticket.clear(); amountEdited = false;
+  $("#sItems").hidden = true; $("#sItems").innerHTML = "";
+  $("#sAmount").value = ""; $("#sNote").value = "";
+  $("#sScan").focus();
 });
 $("#salesList").addEventListener("click", async e => {
   const b = e.target.closest("[data-act='del-sale']"); if (!b) return;
@@ -598,5 +676,5 @@ $("#invShare").addEventListener("click", () => {
   }, "image/png");
 });
 
-window.Caja = {start, stop, undoSale};
+window.Caja = {start, stop, undoSale, scan};
 })();

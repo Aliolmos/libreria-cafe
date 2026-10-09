@@ -143,15 +143,11 @@ html,body{margin:0}
 .warn-text{color:var(--warn);font-weight:600}
 .cart-total{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-display);font-size:18px;font-weight:600}
 .cart-total b{font-size:30px}
-.pay-methods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.pay-methods button{border:2px solid var(--line);background:var(--surface);border-radius:var(--r);padding:9px 6px;font-weight:600;cursor:pointer;color:var(--fg)}
-.pay-methods button:hover{border-color:var(--accent)}
-.pay-methods button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .cart-confirm{justify-content:center;padding:12px 14px;font-size:16px;white-space:normal}
 .seg button[aria-pressed="true"][data-mode="sell"]{background:var(--accent);color:var(--accent-fg)}
 .sale-items{list-style:none;margin:2px 0 0;padding:0 0 0 10px;border-left:2px solid var(--line);display:grid;gap:1px}
 .sale-items li{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding:0;border:0}
-@media (max-width:700px){.pay-methods{grid-template-columns:1fr}.cart-items li{grid-template-columns:minmax(0,1fr) auto auto}.ci-sub{display:none}}
+@media (max-width:700px){.cart-items li{grid-template-columns:minmax(0,1fr) auto auto}.ci-sub{display:none}}
 
 /* Escanear con la cámara */
 .cam-btn{gap:8px;font-weight:600}
@@ -163,6 +159,13 @@ html,body{margin:0}
 .cam-status{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
 .cam-last{padding:8px 12px;border-radius:var(--r);background:var(--ok-soft);color:var(--ok);font-size:14.5px}
 .cam-last b{color:var(--fg)}
+
+/* Venta desde la Caja */
+.sale-scan{display:flex;gap:8px;flex:1 1 100%}
+.sale-scan input{flex:1;min-width:0;font-family:var(--f-mono);font-size:16px;padding:10px 12px}
+.sale-ticket{flex:1 1 100%;border:1px solid var(--line);border-radius:var(--r);padding:4px 10px;background:var(--surface)}
+.sale-ticket li:last-child{border-bottom:0}
+.sale-help{flex:1 1 100%;margin:0}
 
 /* Borrar datos de prueba */
 .cleanup{display:grid;gap:10px;padding:14px 16px}

@@ -427,14 +427,16 @@ let buf = "", lastT = 0, gaps = [];
 document.addEventListener("keydown", e => {
   const t = e.target;
   const typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-  if (typing || document.querySelector("dialog[open]") || $("#stockView").hidden) { buf = ""; return; }
+  // El lector físico funciona en la pestaña Stock y en la Caja.
+  const onStock = !$("#stockView").hidden, onCaja = !$("#cajaView").hidden;
+  if (typing || document.querySelector("dialog[open]") || (!onStock && !onCaja)) { buf = ""; return; }
   const now = performance.now();
   if (now - lastT > 80) { buf = ""; gaps = []; }
   else gaps.push(now - lastT);
   lastT = now;
   if (e.key === "Enter") {
     const avg = gaps.length ? gaps.reduce((a,b) => a+b, 0) / gaps.length : 999;
-    if (buf.length >= 4 && avg < 50) { e.preventDefault(); handleScan(buf); }
+    if (buf.length >= 4 && avg < 50) { e.preventDefault(); onStock ? handleScan(buf) : window.Caja.scan(buf); }
     buf = ""; gaps = [];
     return;
   }
@@ -458,22 +460,14 @@ document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click"
 
 /* ---------- venta: ticket en curso ---------- */
 const cart = new Map();   // código -> cantidad
-let payMethod = null;
 const round2 = n => Math.round(n * 100) / 100;
-const PAY_LABELS = {efectivo:"Efectivo", transferencia:"Transferencia / MP", tarjeta:"Tarjeta"};
 const localDayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
 function addToCart(code, qty){
   cart.set(code, (cart.get(code) || 0) + qty);
   renderCart(code);
 }
-function cartLines(){
-  return [...cart].filter(([code]) => products.has(code)).map(([code, qty]) => {
-    const p = products.get(code);
-    const unit = Number(p.price) || 0;
-    return {code, name: p.name, qty, unitPrice: unit, amount: round2(unit * qty), stock: Number(p.qty) || 0};
-  });
-}
+const cartLines = () => linesFrom(cart);
 function renderCart(justAdded){
   const lines = cartLines();
   const el = $("#cartItems");
@@ -491,12 +485,9 @@ function renderCart(justAdded){
   const total = round2(lines.reduce((s, l) => s + l.amount, 0));
   $("#cartTotal").textContent = money(total);
   $("#cartClear").hidden = !lines.length;
-  document.querySelectorAll("[data-pay]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pay === payMethod)));
   const btn = $("#cartConfirm");
-  btn.disabled = !lines.length || !payMethod;
-  btn.textContent = !lines.length ? "Agregá productos para vender"
-    : !payMethod ? "Elegí cómo pagó"
-    : `Confirmar venta · ${money(total)} · ${PAY_LABELS[payMethod]}`;
+  btn.disabled = !lines.length;
+  btn.textContent = lines.length ? `Confirmar venta · ${money(total)}` : "Agregá productos para vender";
 }
 $("#cartItems").addEventListener("click", e => {
   const b = e.target.closest("[data-cart]"); if (!b) return;
@@ -507,22 +498,29 @@ $("#cartItems").addEventListener("click", e => {
   else cart.delete(code);
   renderCart();
 });
-$("#cartClear").addEventListener("click", () => { cart.clear(); payMethod = null; renderCart(); scanInput.focus(); });
-document.querySelectorAll("[data-pay]").forEach(b => b.addEventListener("click", () => {
-  payMethod = b.dataset.pay; renderCart(); $("#cartConfirm").focus();
-}));
+$("#cartClear").addEventListener("click", () => { cart.clear(); renderCart(); scanInput.focus(); });
 $("#cartConfirm").addEventListener("click", confirmSale);
 setMode("sell");
 renderCart();
 
 function confirmSale(){
   const lines = cartLines();
-  if (!lines.length) return;
-  if (!payMethod) { toast("Elegí si pagó en efectivo, transferencia o tarjeta."); return; }
-  if (!store || !me) return;
+  if (!lines.length || !store || !me) return;
+  const total = registerSale(lines);
+  cart.clear(); renderCart();
+  lines.forEach(l => highlight(l.code));
+  beep(1046);
+  toast(`Venta registrada: ${money(total)}`);
+  scanInput.focus();
+}
+
+// Registra una venta: descuenta cada producto del stock, lo anota en el historial
+// y suma la venta a la Caja. La usan el ticket del escáner y la Caja.
+// lines: [{code, name, qty, unitPrice, amount, stock}]. amount: lo que se cobró (por defecto, la suma).
+function registerSale(lines, {amount, note, day} = {}){
   const now = Date.now();
-  const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-  const items = lines.map(({stock, ...l}) => l);
+  const sum = round2(lines.reduce((s, l) => s + l.amount, 0));
+  const total = amount != null ? amount : sum;
   const batch = fs.batch();
   lines.forEach(l => {
     batch.update(fs.collection("products").doc(docId(l.code)), {qty: increment(-l.qty), updatedAt: now});
@@ -532,21 +530,24 @@ function confirmSale(){
     });
   });
   batch.set(fs.collection("sales").doc(), {
-    amount: total, method: payMethod, kind: "venta", items,
-    note: lines.map(l => `${l.qty}× ${l.name}`).join(", ").slice(0, 200),
-    day: localDayKey(), ts: now, by: me.email, byName: me.name
+    amount: total, kind: "venta", items: lines.map(({stock, ...l}) => l),
+    note: note || lines.map(l => `${l.qty}× ${l.name}`).join(", ").slice(0, 200),
+    day: day || localDayKey(), ts: now, by: me.email, byName: me.name
   });
   // Se aplica al instante en pantalla; Firestore lo sube (o lo guarda si no hay internet).
   batch.commit().catch(e => {
     reportError("venta", e.code || e.message);
     toast("No se pudo guardar la venta (" + (e.code || "error") + "). Revisá la conexión.");
   });
-  const method = PAY_LABELS[payMethod];
-  cart.clear(); payMethod = null; renderCart();
-  lines.forEach(l => highlight(l.code));
-  beep(1046);
-  toast(`Venta registrada: ${money(total)} · ${method}`);
-  scanInput.focus();
+  return total;
+}
+// Arma las líneas de venta a partir de {código: cantidad}.
+function linesFrom(map){
+  return [...map].filter(([code]) => products.has(code)).map(([code, qty]) => {
+    const p = products.get(code);
+    const unit = Number(p.price) || 0;
+    return {code, name: p.name, qty, unitPrice: unit, amount: round2(unit * qty), stock: Number(p.qty) || 0};
+  });
 }
 
 let audio = null;
@@ -580,7 +581,9 @@ document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("cl
 
 /* ---------- alta / edición ---------- */
 const dlgP = $("#dlgProduct");
-function openProduct(code, newCode, newName){
+let afterSave = null;   // si el alta se abrió desde la Caja, qué hacer con el producto nuevo
+function openProduct(code, newCode, newName, onSaved){
+  afterSave = onSaved || null;
   editing = code || null;
   const p = code ? products.get(code) : null;
   $("#dlgProductTitle").textContent = p ? "Editar producto" : "Nuevo producto";
@@ -639,7 +642,7 @@ async function lookupName(code){
     hint.textContent = `Nombre encontrado en ${sources[i].label}. Revisalo y corregilo si hace falta.`;
     $("#fPrice").focus();
   } else if (!name) {
-    hint.textContent = "Este código no está en las bases públicas. Escribí el nombre una sola vez: queda guardado y la próxima vez que lo escanees aparece solo.";
+    hint.textContent = "Este código no está en las bases públicas. Podés escribir el nombre (queda guardado para la próxima) o dejarlo vacío.";
     if (!$("#fName").value.trim()) $("#fName").focus();
   } else hint.hidden = true;
 }
@@ -658,14 +661,15 @@ $("#btnGen").addEventListener("click", () => {
 $("#productForm").addEventListener("submit", async e => {
   e.preventDefault();
   const err = $("#formErr");
-  const name = $("#fName").value.trim();
+  let name = $("#fName").value.trim();
   let code = $("#fCode").value.trim();
-  const price = parseFloat($("#fPrice").value);
+  const priceRaw = $("#fPrice").value.trim();
+  const price = priceRaw === "" ? 0 : parseFloat(priceRaw);   // sin precio = 0; en la Caja se puede poner el monto
   const qty = parseInt($("#fQty").value, 10);
   const min = parseInt($("#fMin").value, 10);
   const show = m => { err.textContent = m; err.hidden = false; };
-  if (!name) return show("Escribí el nombre del producto.");
   if (!code) { code = generateCode(); if (!code) return show("No se pudo generar un código. Probá de nuevo."); $("#fCode").value = code; }
+  if (!name) name = "Sin nombre (" + code + ")";   // el nombre es opcional: se puede completar después
   if (!/^[\x20-\x7E]+$/.test(code)) return show("El código solo puede tener letras, números y símbolos comunes (sin acentos ni ñ).");
   if (code !== editing && products.has(code)) return show("Ese código ya pertenece a “" + products.get(code).name + "”.");
   if (isNaN(price) || price < 0) return show("Poné un precio válido (0 o más).");
@@ -687,10 +691,12 @@ $("#productForm").addEventListener("submit", async e => {
   });
   $("#btnSave").disabled = false;
   if (ok) {
+    const cb = afterSave; afterSave = null;
     dlgP.close();
     toast(prev ? "Producto actualizado" : "Producto agregado");
     highlight(code);
-    if (!prev && mode === "sell") addToCart(code, 1);   // se escaneó para vender: va directo al ticket
+    if (!prev && cb) cb(code);   // alta abierta desde la Caja: va a esa venta
+    else if (!prev && mode === "sell") addToCart(code, 1);   // se escaneó para vender: va directo al ticket
     else if (!prev) showAdded(p);
     if (!prev && isGenerated(code)) setTimeout(() => openLabel(code), 150);
   }
@@ -813,11 +819,12 @@ const camFormats = () => {
   const F = Html5QrcodeSupportedFormats;
   return [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF];
 };
-async function openCamera(target){
+let camCallback = null;   // con target "callback": a quién pasarle cada código leído
+async function openCamera(target, callback){
   if (!window.Html5Qrcode) { toast("No se pudo cargar el lector de la cámara. Revisá la conexión."); return; }
   if (!window.isSecureContext) { toast("La cámara solo funciona en la página publicada (con https)."); return; }
-  camTarget = target;
-  $("#camKeepWrap").hidden = target !== "scan" || mode === "look";
+  camTarget = target; camCallback = callback || null;
+  $("#camKeepWrap").hidden = target === "field" || (target === "scan" && mode === "look");
   $("#camLast").hidden = true;
   $("#camStatus").textContent = "Abriendo la cámara…";
   dlgCam.showModal();
@@ -856,6 +863,14 @@ function onCameraCode(text){
   if (/^\d{12}$/.test(code) && products.has("0" + code)) code = "0" + code;
   if (navigator.vibrate) navigator.vibrate(60);
 
+  if (camTarget === "callback") {   // por ejemplo, la Caja
+    const p = products.get(code);
+    const last = $("#camLast"); last.hidden = false;
+    last.innerHTML = p ? `<b>${esc(p.name)}</b> <span class="meta">· agregado</span>` : `<span class="meta">Código nuevo: ${esc(code)}</span>`;
+    if (!p || !$("#camKeep").checked) closeCamera();
+    camCallback(code);
+    return;
+  }
   if (camTarget === "field") {   // cargando el código en el formulario de producto
     $("#fCode").value = code;
     closeCamera();
@@ -918,6 +933,7 @@ window.Stock = {
   fs, auth, esc, money, int, toast, timeAgo, deviceName,
   get me(){ return me; },
   get products(){ return products; },
-  showView, changeStock, saveFile, docId
+  showView, changeStock, saveFile, docId,
+  openProduct, openCamera, registerSale, linesFrom, beep
 };
 })();
