@@ -77,17 +77,31 @@
       </div>
       <div class="controls">
         <div class="seg" role="group" aria-label="Modo de escaneo">
-          <button type="button" data-mode="in" aria-pressed="true">Entrada +</button>
+          <button type="button" data-mode="sell" aria-pressed="true">Venta</button>
+          <button type="button" data-mode="in" aria-pressed="false">Entrada +</button>
           <button type="button" data-mode="out" aria-pressed="false">Salida −</button>
           <button type="button" data-mode="look" aria-pressed="false">Consultar</button>
         </div>
         <label class="qty-field">Cantidad <input id="scanQty" type="number" min="1" step="1" value="1"></label>
         <button class="btn" type="button" id="btnManual">+ Agregar sin escáner</button>
       </div>
-      <div class="armed-hint" id="armedHint">Sin escáner: escribí el nombre o el código y elegí el producto de la lista. Si no existe, se abre el alta con lo que escribiste.</div>
+      <div class="armed-hint" id="armedHint"></div>
     </div>
-    <div class="result" id="result" aria-live="polite">
-      <div class="empty">El último producto escaneado aparece acá, con su stock actualizado.</div>
+    <div class="result-col">
+      <div class="cart" id="cart">
+        <div class="cart-head"><span class="label">Venta en curso</span><button class="link-btn" type="button" id="cartClear" hidden>Vaciar</button></div>
+        <ul class="cart-items" id="cartItems"><li class="empty">Escaneá o buscá los productos que se llevan. Se van sumando acá.</li></ul>
+        <div class="cart-total"><span>Total</span><b class="num" id="cartTotal">$0,00</b></div>
+        <div class="pay-methods" role="group" aria-label="¿Cómo pagó?">
+          <button type="button" data-pay="efectivo" aria-pressed="false">Efectivo</button>
+          <button type="button" data-pay="transferencia" aria-pressed="false">Transferencia / MP</button>
+          <button type="button" data-pay="tarjeta" aria-pressed="false">Tarjeta</button>
+        </div>
+        <button class="btn primary cart-confirm" type="button" id="cartConfirm" disabled>Agregá productos para vender</button>
+      </div>
+      <div class="result" id="result" aria-live="polite" hidden>
+        <div class="empty">El último producto escaneado aparece acá, con su stock actualizado.</div>
+      </div>
     </div>
   </section>
 
@@ -151,6 +165,7 @@
       <div class="metric"><span class="label">Efectivo</span><span class="v" id="cCash">$0,00</span></div>
       <div class="metric"><span class="label">Transferencia / MP</span><span class="v" id="cTransfer">$0,00</span></div>
       <div class="metric"><span class="label">Tarjeta</span><span class="v" id="cCard">$0,00</span></div>
+      <div class="metric good-metric"><span class="label">Ganancia del día</span><span class="v" id="cProfit">$0,00</span><span class="meta" id="cProfitN"></span></div>
       <div class="metric alert"><span class="label">Deudas sin cobrar</span><span class="v" id="cOwed">$0,00</span><span class="meta" id="cOwedN">nadie debe</span></div>
     </section>
 
@@ -255,7 +270,7 @@
           <label class="check"><input type="checkbox" id="clAllSales"> Toda la caja (ventas y cobros de todos los días)</label>
           <label class="check"><input type="checkbox" id="clDebts"> Todas las deudas (fiado), pendientes y pagadas</label>
           <label class="check"><input type="checkbox" id="clAccounts"> Todas las cuentas mensuales, con sus retiros y pagos</label>
-          <label class="check sub-check"><input type="checkbox" id="clRestock" checked> Devolver al stock los productos de esos retiros</label>
+          <label class="check sub-check"><input type="checkbox" id="clRestock" checked> Devolver al stock los productos de las ventas y retiros que se borran</label>
           <div class="cleanup-actions">
             <button class="btn danger" type="submit" id="btnCleanup">Revisar qué se va a borrar</button>
           </div>
@@ -302,7 +317,8 @@
           </div>
           <span class="hint" id="codeHint">Si lo dejás vacío, al guardar se genera un EAN‑13 interno (empieza con 20) y te muestra la etiqueta para imprimir.</span>
         </div>
-        <div class="field"><label class="label" for="fPrice">Precio unitario</label><input id="fPrice" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label class="label" for="fPrice">Precio de venta</label><input id="fPrice" type="number" min="0" step="0.01" placeholder="0,00"></div>
+        <div class="field"><label class="label" for="fCost">Costo (opcional)</label><input id="fCost" type="number" min="0" step="0.01" placeholder="Lo que te costó a vos"></div>
         <div class="field"><label class="label" for="fQty">Stock actual</label><input id="fQty" type="number" step="1" value="0"></div>
         <div class="field"><label class="label" for="fMin">Stock mínimo (alerta)</label><input id="fMin" type="number" min="0" step="1" value="5"></div>
         <div class="field"><label class="label" for="fCat">Categoría</label><select id="fCat"></select></div>

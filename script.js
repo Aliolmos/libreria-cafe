@@ -29,7 +29,7 @@ const isEAN13 = c => /^\d{13}$/.test(c) && ean13Check(c.slice(0,12)) === c[12];
 /* ---------- estado ---------- */
 let products = new Map();   // code -> producto
 let moves = [];
-let mode = "in";
+let mode = "sell";
 let sort = {key:"name", dir:1};
 let editing = null;          // código original en edición
 let labelProduct = null;
@@ -268,6 +268,7 @@ function render(){
       </div></td>
     </tr>`;
   }).join("") || (all.length ? `<tr><td colspan="6" style="color:var(--muted);padding:20px 12px">Ningún producto coincide con el filtro.</td></tr>` : "");
+  if (cart.size) renderCart();   // precios y stock del ticket al día
   document.querySelectorAll("th[data-sort]").forEach(th => {
     const base = th.textContent.replace(/ [↑↓]$/,"");
     th.textContent = base + (th.dataset.sort === sort.key ? (sort.dir > 0 ? " ↑" : " ↓") : "");
@@ -327,6 +328,7 @@ async function handleScan(raw){
     return;
   }
   const qty = Math.max(1, parseInt($("#scanQty").value,10) || 1);
+  if (mode === "sell") { addToCart(code, qty); beep(880); return; }
   let after = Number(p.qty)||0, delta = 0;
   if (mode !== "look") {
     delta = mode === "in" ? qty : -qty;
@@ -412,6 +414,8 @@ scanInput.addEventListener("keydown", e => {
     e.preventDefault();
     const v = scanInput.value.trim();
     if (sugIndex >= 0) return pickSug(sugIndex);
+    // Enter con el campo vacío en modo Venta: confirmar la venta.
+    if (!v && mode === "sell" && cart.size) return confirmSale();
     scanInput.value = "";
     if (products.has(v)) return handleScan(v);
     // Nombre escrito a mano que coincide con un solo producto: usar ese.
@@ -439,11 +443,117 @@ document.addEventListener("keydown", e => {
   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) buf += e.key;
 });
 
-document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
-  mode = b.dataset.mode;
-  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+const MODE_HINTS = {
+  sell: "Venta: escaneá o buscá cada producto que se llevan, elegí cómo pagó y confirmá. Se descuenta del stock y se suma a la Caja del día.",
+  in: "Entrada: cada escaneo suma al stock (mercadería que llegó).",
+  out: "Salida: cada escaneo resta del stock sin registrar venta (roturas, uso interno).",
+  look: "Consultar: muestra el stock y el precio sin cambiar nada."
+};
+function setMode(m){
+  mode = m;
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.mode === m)));
+  $("#armedHint").textContent = MODE_HINTS[m] + " Sin escáner: escribí el nombre o el código y elegí de la lista.";
+  $("#cart").hidden = m !== "sell";
+  $("#result").hidden = m === "sell";
   scanInput.focus();
+}
+document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+/* ---------- venta: ticket en curso ---------- */
+const cart = new Map();   // código -> cantidad
+let payMethod = null;
+const round2 = n => Math.round(n * 100) / 100;
+const PAY_LABELS = {efectivo:"Efectivo", transferencia:"Transferencia / MP", tarjeta:"Tarjeta"};
+const localDayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+
+function addToCart(code, qty){
+  cart.set(code, (cart.get(code) || 0) + qty);
+  renderCart(code);
+}
+function cartLines(){
+  return [...cart].filter(([code]) => products.has(code)).map(([code, qty]) => {
+    const p = products.get(code);
+    const unit = Number(p.price) || 0;
+    const cost = p.cost == null || p.cost === "" ? null : Number(p.cost);
+    return {code, name: p.name, qty, unitPrice: unit, amount: round2(unit * qty), cost: cost == null ? null : round2(cost * qty), stock: Number(p.qty) || 0};
+  });
+}
+function renderCart(justAdded){
+  const lines = cartLines();
+  const el = $("#cartItems");
+  el.innerHTML = lines.length ? lines.map(l => `
+    <li data-code="${esc(l.code)}"${l.code === justAdded ? ' class="just"' : ""}>
+      <div class="ci-name"><b>${esc(l.name)}</b><span class="meta">${money(l.unitPrice)} c/u${l.qty > l.stock ? ` · <span class="warn-text">quedan ${int(l.stock)} en stock</span>` : ""}</span></div>
+      <span class="stock-cell">
+        <button class="btn icon-btn" type="button" data-cart="dec" aria-label="Uno menos">−</button>
+        <span class="q">${int(l.qty)}</span>
+        <button class="btn icon-btn" type="button" data-cart="inc" aria-label="Uno más">+</button>
+      </span>
+      <b class="num ci-sub">${money(l.amount)}</b>
+      <button class="link-btn" type="button" data-cart="del" aria-label="Sacar del ticket">✕</button>
+    </li>`).join("") : '<li class="empty">Escaneá o buscá los productos que se llevan. Se van sumando acá.</li>';
+  const total = round2(lines.reduce((s, l) => s + l.amount, 0));
+  $("#cartTotal").textContent = money(total);
+  $("#cartClear").hidden = !lines.length;
+  document.querySelectorAll("[data-pay]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.pay === payMethod)));
+  const btn = $("#cartConfirm");
+  btn.disabled = !lines.length || !payMethod;
+  btn.textContent = !lines.length ? "Agregá productos para vender"
+    : !payMethod ? "Elegí cómo pagó"
+    : `Confirmar venta · ${money(total)} · ${PAY_LABELS[payMethod]}`;
+}
+$("#cartItems").addEventListener("click", e => {
+  const b = e.target.closest("[data-cart]"); if (!b) return;
+  const code = b.closest("li").dataset.code;
+  const q = cart.get(code) || 0;
+  if (b.dataset.cart === "inc") cart.set(code, q + 1);
+  else if (b.dataset.cart === "dec") q > 1 ? cart.set(code, q - 1) : cart.delete(code);
+  else cart.delete(code);
+  renderCart();
+});
+$("#cartClear").addEventListener("click", () => { cart.clear(); payMethod = null; renderCart(); scanInput.focus(); });
+document.querySelectorAll("[data-pay]").forEach(b => b.addEventListener("click", () => {
+  payMethod = b.dataset.pay; renderCart(); $("#cartConfirm").focus();
 }));
+$("#cartConfirm").addEventListener("click", confirmSale);
+setMode("sell");
+renderCart();
+
+function confirmSale(){
+  const lines = cartLines();
+  if (!lines.length) return;
+  if (!payMethod) { toast("Elegí si pagó en efectivo, transferencia o tarjeta."); return; }
+  if (!store || !me) return;
+  const now = Date.now();
+  const total = round2(lines.reduce((s, l) => s + l.amount, 0));
+  const costKnown = lines.every(l => l.cost != null);
+  const items = lines.map(({stock, ...l}) => l);
+  const batch = fs.batch();
+  lines.forEach(l => {
+    batch.update(fs.collection("products").doc(docId(l.code)), {qty: increment(-l.qty), updatedAt: now});
+    batch.set(fs.collection("moves").doc(), {
+      code: l.code, name: l.name, delta: -l.qty, type: "out", qtyAfter: l.stock - l.qty,
+      ts: now, source: "venta", by: me.email, byName: me.name
+    });
+  });
+  batch.set(fs.collection("sales").doc(), {
+    amount: total, method: payMethod, kind: "venta", items,
+    cost: costKnown ? round2(lines.reduce((s, l) => s + l.cost, 0)) : null,
+    note: lines.map(l => `${l.qty}× ${l.name}`).join(", ").slice(0, 200),
+    day: localDayKey(), ts: now, by: me.email, byName: me.name
+  });
+  // Se aplica al instante en pantalla; Firestore lo sube (o lo guarda si no hay internet).
+  batch.commit().catch(e => {
+    reportError("venta", e.code || e.message);
+    toast("No se pudo guardar la venta (" + (e.code || "error") + "). Revisá la conexión.");
+  });
+  const method = PAY_LABELS[payMethod];
+  cart.clear(); payMethod = null; renderCart();
+  lines.forEach(l => highlight(l.code));
+  beep(1046);
+  toast(`Venta registrada: ${money(total)} · ${method}`);
+  scanInput.focus();
+}
 
 let audio = null;
 function beep(freq){
@@ -484,6 +594,7 @@ function openProduct(code, newCode, newName){
   $("#nameHint").hidden = true;
   $("#fCode").value = p ? p.code : (newCode || "");
   $("#fPrice").value = p ? p.price : "";
+  $("#fCost").value = p && p.cost != null ? p.cost : "";
   $("#fQty").value = p ? p.qty : (newCode && mode === "in" ? Math.max(1, parseInt($("#scanQty").value,10)||1) : 0);
   $("#fMin").value = p ? (p.min ?? 5) : 5;
   fillCategorySelect(p ? (p.cat || "") : "");
@@ -567,8 +678,12 @@ $("#productForm").addEventListener("submit", async e => {
   if (code !== editing && products.has(code)) return show("Ese código ya pertenece a “" + products.get(code).name + "”.");
   if (isNaN(price) || price < 0) return show("Poné un precio válido (0 o más).");
   const prev = editing ? products.get(editing) : null;
+  const costRaw = $("#fCost").value.trim();
+  const cost = costRaw === "" ? null : parseFloat(costRaw);
+  if (cost !== null && (isNaN(cost) || cost < 0)) return show("El costo tiene que ser un número (o dejalo vacío).");
   const p = {
     code, name, price: Math.round(price*100)/100,
+    cost: cost === null ? null : Math.round(cost*100)/100,
     qty: isNaN(qty) ? 0 : qty, min: isNaN(min) ? 0 : min,
     cat: $("#fCat").value.trim(),
     brand: $("#fBrand").value.trim(),
@@ -588,7 +703,8 @@ $("#productForm").addEventListener("submit", async e => {
     dlgP.close();
     toast(prev ? "Producto actualizado" : "Producto agregado");
     highlight(code);
-    if (!prev) showAdded(p);
+    if (!prev && mode === "sell") addToCart(code, 1);   // se escaneó para vender: va directo al ticket
+    else if (!prev) showAdded(p);
     if (!prev && isGenerated(code)) setTimeout(() => openLabel(code), 150);
   }
 });
@@ -741,6 +857,6 @@ window.Stock = {
   fs, auth, esc, money, int, toast, timeAgo, deviceName,
   get me(){ return me; },
   get products(){ return products; },
-  showView, changeStock, saveFile
+  showView, changeStock, saveFile, docId
 };
 })();

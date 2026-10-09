@@ -140,7 +140,7 @@ function renderMoves(){
   const {esc, int} = S();
   const who = $("#movesUser").value;
   const list = allMoves.filter(m => !who || m.by === who);
-  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición", cuenta:"Cuenta mensual"};
+  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición", cuenta:"Cuenta mensual", venta:"Venta", "anulación":"Venta borrada"};
   $("#allMoves").innerHTML = list.map(m => {
     const d = m.type === "set" ? "=" + m.qtyAfter : (m.delta > 0 ? "+" : "") + m.delta;
     const color = m.type === "set" ? "--accent" : m.delta >= 0 ? "--ok" : "--bad";
@@ -224,7 +224,8 @@ $("#btnCleanupOk").addEventListener("click", async () => {
       const data = s.data();
       const keepsDebt = data.kind === "cobro-deuda" && !plan.opt.debts;
       const keepsAccount = data.kind === "cuenta" && !plan.opt.accounts;
-      if (keepsDebt || keepsAccount) await window.Caja.undoSale(s.id, data);
+      const restocks = data.items && plan.opt.restock;
+      if (keepsDebt || keepsAccount || restocks) await window.Caja.undoSale(s.id, data);
     }
     // Devolver al stock lo que se llevaron las cuentas (antes de borrar los retiros).
     if (plan.opt.restock) {

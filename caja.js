@@ -106,6 +106,13 @@ function renderTotals(){
   $("#cCash").textContent = money(sum(s => s.method === "efectivo"));
   $("#cTransfer").textContent = money(sum(s => s.method === "transferencia"));
   $("#cCard").textContent = money(sum(s => s.method === "tarjeta"));
+  // Ganancia: lo vendido menos el costo, solo en ventas cuyos productos tienen costo cargado.
+  const withCost = sales.filter(s => s.cost != null);
+  const noCost = sales.filter(s => s.items && s.cost == null).length;
+  $("#cProfit").textContent = money(round2(withCost.reduce((a, s) => a + (+s.amount || 0) - (+s.cost || 0), 0)));
+  $("#cProfitN").textContent = noCost
+    ? `${noCost} venta${noCost > 1 ? "s" : ""} sin costo cargado`
+    : withCost.length ? `de ${withCost.length} venta${withCost.length > 1 ? "s" : ""}` : "cargá el costo en los productos";
   $("#cOwed").textContent = money(round2(pending.reduce((a, d) => a + rem(d), 0)));
   const people = new Set(pending.map(d => d.name.trim().toLowerCase())).size;
   $("#cOwedN").textContent = people ? `${people} persona${people > 1 ? "s" : ""}` : "nadie debe";
@@ -120,7 +127,8 @@ function renderSales(){
     return;
   }
   el.innerHTML = sales.map(s => `<li data-id="${esc(s.id)}">
-    <div class="row"><span><span class="meta">${hhmm(s.ts)}</span> ${esc(s.note || KINDS[s.kind] || "Venta")}</span><b class="num">${money(s.amount)}</b></div>
+    <div class="row"><span><span class="meta">${hhmm(s.ts)}</span> ${s.items ? "Venta" + (s.items.length > 1 ? ` (${s.items.length} productos)` : "") : esc(s.note || KINDS[s.kind] || "Venta")}</span><b class="num">${money(s.amount)}</b></div>
+    ${s.items ? `<ul class="sale-items">${s.items.map(i => `<li><span>${i.qty} × ${esc(i.name)}</span><span class="num">${money(i.amount)}</span></li>`).join("")}</ul>` : ""}
     <div class="row"><span class="meta">${METHODS[s.method] || esc(s.method)}${s.kind && s.kind !== "venta" ? " · " + KINDS[s.kind] : ""} · ${esc(s.byName || s.by || "")}</span>
       ${s.kind === "venta" || !s.kind || S().me.isAdmin ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
   </li>`).join("");
@@ -139,7 +147,7 @@ $("#salesList").addEventListener("click", async e => {
   const b = e.target.closest("[data-act='del-sale']"); if (!b) return;
   const s = sales.find(x => x.id === b.closest("li").dataset.id); if (!s) return;
   if (!confirmTwice(b, s.kind && s.kind !== "venta" ? "¿Borrar y deshacer el cobro?" : "¿Borrar?")) return;
-  try { await undoSale(s.id, s); S().toast(s.kind === "cobro-deuda" ? "Cobro borrado. La deuda vuelve a figurar como pendiente." : s.kind === "cuenta" ? "Cobro borrado. La cuenta vuelve a figurar sin pagar." : "Venta borrada"); }
+  try { await undoSale(s.id, s); S().toast(s.kind === "cobro-deuda" ? "Cobro borrado. La deuda vuelve a figurar como pendiente." : s.kind === "cuenta" ? "Cobro borrado. La cuenta vuelve a figurar sin pagar." : s.items ? "Venta borrada. Los productos volvieron al stock." : "Venta borrada"); }
   catch(ex){ S().toast("No se pudo borrar (" + (ex.code || "error") + ")."); }
 });
 
@@ -149,6 +157,16 @@ async function undoSale(id, s){
   const {fs} = S();
   const batch = fs.batch();
   batch.delete(fs.doc("sales/" + id));
+  // Venta con productos: vuelven al stock.
+  (s.items || []).forEach(i => {
+    if (!S().products.has(i.code)) return;
+    batch.update(fs.collection("products").doc(S().docId(i.code)), {qty: FV().increment(+i.qty || 0), updatedAt: Date.now()});
+    batch.set(fs.collection("moves").doc(), {
+      code: i.code, name: i.name, delta: +i.qty || 0, type: "in",
+      qtyAfter: (Number(S().products.get(i.code).qty) || 0) + (+i.qty || 0),
+      ts: Date.now(), source: "anulación", ...who()
+    });
+  });
   if (s.kind === "cobro-deuda" && s.debtId) {
     const d = await fs.doc("debts/" + s.debtId).get();
     if (d.exists) {
