@@ -106,13 +106,6 @@ function renderTotals(){
   $("#cCash").textContent = money(sum(s => s.method === "efectivo"));
   $("#cTransfer").textContent = money(sum(s => s.method === "transferencia"));
   $("#cCard").textContent = money(sum(s => s.method === "tarjeta"));
-  // Ganancia: lo vendido menos el costo, solo en ventas cuyos productos tienen costo cargado.
-  const withCost = sales.filter(s => s.cost != null);
-  const noCost = sales.filter(s => s.items && s.cost == null).length;
-  $("#cProfit").textContent = money(round2(withCost.reduce((a, s) => a + (+s.amount || 0) - (+s.cost || 0), 0)));
-  $("#cProfitN").textContent = noCost
-    ? `${noCost} venta${noCost > 1 ? "s" : ""} sin costo cargado`
-    : withCost.length ? `de ${withCost.length} venta${withCost.length > 1 ? "s" : ""}` : "cargá el costo en los productos";
   $("#cOwed").textContent = money(round2(pending.reduce((a, d) => a + rem(d), 0)));
   const people = new Set(pending.map(d => d.name.trim().toLowerCase())).size;
   $("#cOwedN").textContent = people ? `${people} persona${people > 1 ? "s" : ""}` : "nadie debe";

@@ -79,7 +79,6 @@
         <div class="seg" role="group" aria-label="Modo de escaneo">
           <button type="button" data-mode="sell" aria-pressed="true">Venta</button>
           <button type="button" data-mode="in" aria-pressed="false">Entrada +</button>
-          <button type="button" data-mode="out" aria-pressed="false">Salida −</button>
           <button type="button" data-mode="look" aria-pressed="false">Consultar</button>
         </div>
         <label class="qty-field">Cantidad <input id="scanQty" type="number" min="1" step="1" value="1"></label>
@@ -165,7 +164,6 @@
       <div class="metric"><span class="label">Efectivo</span><span class="v" id="cCash">$0,00</span></div>
       <div class="metric"><span class="label">Transferencia / MP</span><span class="v" id="cTransfer">$0,00</span></div>
       <div class="metric"><span class="label">Tarjeta</span><span class="v" id="cCard">$0,00</span></div>
-      <div class="metric good-metric"><span class="label">Ganancia del día</span><span class="v" id="cProfit">$0,00</span><span class="meta" id="cProfitN"></span></div>
       <div class="metric alert"><span class="label">Deudas sin cobrar</span><span class="v" id="cOwed">$0,00</span><span class="meta" id="cOwedN">nadie debe</span></div>
     </section>
 
@@ -318,11 +316,9 @@
           <span class="hint" id="codeHint">Si lo dejás vacío, al guardar se genera un EAN‑13 interno (empieza con 20) y te muestra la etiqueta para imprimir.</span>
         </div>
         <div class="field"><label class="label" for="fPrice">Precio de venta</label><input id="fPrice" type="number" min="0" step="0.01" placeholder="0,00"></div>
-        <div class="field"><label class="label" for="fCost">Costo (opcional)</label><input id="fCost" type="number" min="0" step="0.01" placeholder="Lo que te costó a vos"></div>
         <div class="field"><label class="label" for="fQty">Stock actual</label><input id="fQty" type="number" step="1" value="0"></div>
         <div class="field"><label class="label" for="fMin">Stock mínimo (alerta)</label><input id="fMin" type="number" min="0" step="1" value="5"></div>
         <div class="field"><label class="label" for="fCat">Categoría</label><select id="fCat"></select></div>
-        <div class="field"><label class="label" for="fBrand">Marca (opcional)</label><input id="fBrand" maxlength="40" list="brandList" placeholder="Ej: Rivadavia, Bic, Avon, Natura"><datalist id="brandList"></datalist></div>
       </div>
       <div class="err" id="formErr" hidden></div>
     </div>

@@ -83,7 +83,7 @@ html,body{margin:0}
 .caja-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .field.inline{display:inline-grid;gap:4px}
 .field.inline input{padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);width:auto}
-.caja-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.caja-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}
 .main-metric{background:var(--accent-soft);border-color:var(--accent)}
 .main-metric .v{color:var(--accent);font-size:30px}
 .caja-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
@@ -148,10 +148,9 @@ html,body{margin:0}
 .pay-methods button:hover{border-color:var(--accent)}
 .pay-methods button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .cart-confirm{justify-content:center;padding:12px 14px;font-size:16px;white-space:normal}
-.seg button[aria-pressed="true"][data-mode="sell"]{background:var(--accent-soft);color:var(--accent)}
+.seg button[aria-pressed="true"][data-mode="sell"]{background:var(--accent);color:var(--accent-fg)}
 .sale-items{list-style:none;margin:2px 0 0;padding:0 0 0 10px;border-left:2px solid var(--line);display:grid;gap:1px}
 .sale-items li{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding:0;border:0}
-.good-metric .v{color:var(--ok)}
 @media (max-width:700px){.pay-methods{grid-template-columns:1fr}.cart-items li{grid-template-columns:minmax(0,1fr) auto auto}.ci-sub{display:none}}
 
 /* Borrar datos de prueba */
@@ -227,12 +226,13 @@ h1{color:var(--fg)}
 .armed-hint{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
 .armed-hint b{color:var(--fg);font-weight:600}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--bg)}
-.seg button{border:0;background:transparent;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px;color:var(--muted)}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed="true"][data-mode="in"]{background:var(--ok-soft);color:var(--ok)}
-.seg button[aria-pressed="true"][data-mode="out"]{background:var(--bad-soft);color:var(--bad)}
-.seg button[aria-pressed="true"][data-mode="look"]{background:var(--accent-soft);color:var(--accent)}
+.seg{display:inline-flex;border:2px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.seg button{border:0;background:transparent;padding:13px 26px;cursor:pointer;font-weight:700;font-size:17px;color:var(--muted);min-width:120px}
+.seg button+button{border-left:2px solid var(--line)}
+.seg button[aria-pressed="true"][data-mode="in"]{background:var(--ok);color:var(--surface)}
+.seg button[aria-pressed="true"][data-mode="look"]{background:var(--fg);color:var(--surface)}
+.seg button:hover:not([aria-pressed="true"]){background:var(--surface-2);color:var(--fg)}
+@media (max-width:700px){.seg{display:flex;width:100%}.seg button{flex:1;min-width:0;padding:13px 8px}}
 .qty-field{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
 .qty-field input{width:72px;padding:7px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);text-align:center}
 

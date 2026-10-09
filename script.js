@@ -201,7 +201,6 @@ const CATEGORIES = {
     "Sets de regalo", "Otros de perfumería"
   ]
 };
-const BRANDS = ["Avon", "Natura", "Rivadavia", "Gloria", "Éxito", "Ledesma", "Laprida", "Bic", "Faber-Castell", "Filgo", "Maped", "Pizzini", "Simball", "Staedtler", "Paper Mate", "Plantec", "Alba", "Sifap"];
 const groupOf = cat => Object.keys(CATEGORIES).find(g => CATEGORIES[g].includes(cat)) || "";
 function fillCategorySelect(selected){
   const known = groupOf(selected);
@@ -230,15 +229,13 @@ function render(){
     Object.entries(CATEGORIES).map(([g, subs]) =>
       `<optgroup label="${esc(g)}">${opt("g:" + g, "Toda " + (g === "Librería" ? "la librería" : "la perfumería"))}${subs.map(s => opt("c:" + s, s)).join("")}</optgroup>`).join("") +
     (legacy.length ? `<optgroup label="Otras">${legacy.map(c => opt("c:" + c, c)).join("")}</optgroup>` : "");
-  const brands = [...new Set([...BRANDS, ...all.map(p => (p.brand||"").trim()).filter(Boolean)])].sort((a,b) => a.localeCompare(b,"es"));
-  $("#brandList").innerHTML = brands.map(b => `<option value="${esc(b)}">`).join("");
 
   // filtros
   const q = $("#search").value.trim().toLowerCase();
   const cat = cf.value, sf = $("#stockFilter").value;
   const inCat = p => !cat || (cat.startsWith("g:") ? groupOf((p.cat||"").trim()) === cat.slice(2) : (p.cat||"").trim() === cat.slice(2));
   let list = all.filter(p =>
-    (!q || [p.name,p.code,p.cat,p.brand].some(v => String(v||"").toLowerCase().includes(q))) &&
+    (!q || [p.name,p.code,p.cat].some(v => String(v||"").toLowerCase().includes(q))) &&
     inCat(p) &&
     (!sf || status(p) === sf));
   const val = p => sort.key === "value" ? (Number(p.qty)||0)*(Number(p.price)||0) : p[sort.key];
@@ -252,7 +249,7 @@ function render(){
   $("#rows").innerHTML = list.map(p => {
     const st = status(p);
     return `<tr data-code="${esc(p.code)}">
-      <td class="c-name"><div class="p-name">${esc(p.name)}</div>${p.cat || p.brand ? `<div class="p-cat">${esc([groupOf(p.cat), p.cat, p.brand].filter(Boolean).join(" · "))}</div>` : ""}</td>
+      <td class="c-name"><div class="p-name">${esc(p.name)}</div>${p.cat ? `<div class="p-cat">${esc([groupOf(p.cat), p.cat].filter(Boolean).join(" · "))}</div>` : ""}</td>
       <td class="c-code"><span class="code">${esc(p.code)}</span></td>
       <td class="c-price r num">${money(p.price)}</td>
       <td class="c-stock"><span class="stock-cell">
@@ -337,9 +334,9 @@ async function handleScan(raw){
     after = r;
   } else highlight(code);
   const st = status({...p, qty:after});
-  res.classList.add(mode === "in" ? "flash-in" : mode === "out" ? "flash-out" : "flash-look");
+  res.classList.add(mode === "in" ? "flash-in" : "flash-look");
   res.innerHTML = `
-    <span class="label">${mode === "look" ? "Consulta" : mode === "in" ? "Entrada registrada" : "Salida registrada"} · <span class="mono">${esc(code)}</span></span>
+    <span class="label">${mode === "look" ? "Consulta" : "Entrada registrada"} · <span class="mono">${esc(code)}</span></span>
     <div class="r-name">${esc(p.name)}</div>
     <div class="r-row">
       <span><span class="r-big num">${int(after)}</span> <span class="label">en stock</span></span>
@@ -347,7 +344,7 @@ async function handleScan(raw){
       <span class="pill ${st}">${statusLabel[st]}</span>
       <span class="num">${money(p.price)} c/u</span>
     </div>`;
-  beep(mode === "out" ? 660 : 880);
+  beep(880);
 }
 function showAdded(p){
   const res = $("#result");
@@ -446,7 +443,6 @@ document.addEventListener("keydown", e => {
 const MODE_HINTS = {
   sell: "Venta: escaneá o buscá cada producto que se llevan, elegí cómo pagó y confirmá. Se descuenta del stock y se suma a la Caja del día.",
   in: "Entrada: cada escaneo suma al stock (mercadería que llegó).",
-  out: "Salida: cada escaneo resta del stock sin registrar venta (roturas, uso interno).",
   look: "Consultar: muestra el stock y el precio sin cambiar nada."
 };
 function setMode(m){
@@ -474,8 +470,7 @@ function cartLines(){
   return [...cart].filter(([code]) => products.has(code)).map(([code, qty]) => {
     const p = products.get(code);
     const unit = Number(p.price) || 0;
-    const cost = p.cost == null || p.cost === "" ? null : Number(p.cost);
-    return {code, name: p.name, qty, unitPrice: unit, amount: round2(unit * qty), cost: cost == null ? null : round2(cost * qty), stock: Number(p.qty) || 0};
+    return {code, name: p.name, qty, unitPrice: unit, amount: round2(unit * qty), stock: Number(p.qty) || 0};
   });
 }
 function renderCart(justAdded){
@@ -526,7 +521,6 @@ function confirmSale(){
   if (!store || !me) return;
   const now = Date.now();
   const total = round2(lines.reduce((s, l) => s + l.amount, 0));
-  const costKnown = lines.every(l => l.cost != null);
   const items = lines.map(({stock, ...l}) => l);
   const batch = fs.batch();
   lines.forEach(l => {
@@ -538,7 +532,6 @@ function confirmSale(){
   });
   batch.set(fs.collection("sales").doc(), {
     amount: total, method: payMethod, kind: "venta", items,
-    cost: costKnown ? round2(lines.reduce((s, l) => s + l.cost, 0)) : null,
     note: lines.map(l => `${l.qty}× ${l.name}`).join(", ").slice(0, 200),
     day: localDayKey(), ts: now, by: me.email, byName: me.name
   });
@@ -594,11 +587,9 @@ function openProduct(code, newCode, newName){
   $("#nameHint").hidden = true;
   $("#fCode").value = p ? p.code : (newCode || "");
   $("#fPrice").value = p ? p.price : "";
-  $("#fCost").value = p && p.cost != null ? p.cost : "";
   $("#fQty").value = p ? p.qty : (newCode && mode === "in" ? Math.max(1, parseInt($("#scanQty").value,10)||1) : 0);
   $("#fMin").value = p ? (p.min ?? 5) : 5;
   fillCategorySelect(p ? (p.cat || "") : "");
-  $("#fBrand").value = p ? (p.brand || "") : "";
   $("#formErr").hidden = true;
   const del = $("#btnDelete"); del.hidden = !p; del.classList.remove("armed"); del.textContent = "Eliminar";
   dlgP.showModal();
@@ -678,15 +669,10 @@ $("#productForm").addEventListener("submit", async e => {
   if (code !== editing && products.has(code)) return show("Ese código ya pertenece a “" + products.get(code).name + "”.");
   if (isNaN(price) || price < 0) return show("Poné un precio válido (0 o más).");
   const prev = editing ? products.get(editing) : null;
-  const costRaw = $("#fCost").value.trim();
-  const cost = costRaw === "" ? null : parseFloat(costRaw);
-  if (cost !== null && (isNaN(cost) || cost < 0)) return show("El costo tiene que ser un número (o dejalo vacío).");
   const p = {
     code, name, price: Math.round(price*100)/100,
-    cost: cost === null ? null : Math.round(cost*100)/100,
     qty: isNaN(qty) ? 0 : qty, min: isNaN(min) ? 0 : min,
     cat: $("#fCat").value.trim(),
-    brand: $("#fBrand").value.trim(),
     createdAt: prev ? (prev.createdAt || Date.now()) : Date.now(),
     updatedAt: Date.now()
   };
