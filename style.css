@@ -83,7 +83,7 @@ html,body{margin:0}
 .caja-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .field.inline{display:inline-grid;gap:4px}
 .field.inline input{padding:7px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);width:auto}
-.caja-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}
+.caja-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 .main-metric{background:var(--accent-soft);border-color:var(--accent)}
 .main-metric .v{color:var(--accent);font-size:30px}
 .caja-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}

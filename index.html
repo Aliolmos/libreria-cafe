@@ -165,9 +165,6 @@
 
     <section class="metrics caja-metrics" aria-label="Resumen del día">
       <div class="metric main-metric"><span class="label" id="cTotalLabel">Total de hoy</span><span class="v" id="cTotal">$0,00</span></div>
-      <div class="metric"><span class="label">Efectivo</span><span class="v" id="cCash">$0,00</span></div>
-      <div class="metric"><span class="label">Transferencia / MP</span><span class="v" id="cTransfer">$0,00</span></div>
-      <div class="metric"><span class="label">Tarjeta</span><span class="v" id="cCard">$0,00</span></div>
       <div class="metric alert"><span class="label">Deudas sin cobrar</span><span class="v" id="cOwed">$0,00</span><span class="meta" id="cOwedN">nadie debe</span></div>
     </section>
 
@@ -176,11 +173,6 @@
         <div class="panel-head"><h2>Ventas del día</h2></div>
         <form class="caja-form" id="saleForm" novalidate>
           <input id="sAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Monto" aria-label="Monto de la venta">
-          <select id="sMethod" aria-label="Medio de pago">
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia / MP</option>
-            <option value="tarjeta">Tarjeta</option>
-          </select>
           <input id="sNote" class="grow" maxlength="120" placeholder="Detalle (opcional): café + medialuna" aria-label="Detalle">
           <button class="btn primary" type="submit">Agregar venta</button>
         </form>

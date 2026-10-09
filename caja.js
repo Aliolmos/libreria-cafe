@@ -20,9 +20,7 @@ const fmtFull = ts => new Date(ts).toLocaleDateString("es-AR", {day:"2-digit", m
 const hhmm = ts => new Date(ts).toLocaleTimeString("es-AR", {hour:"2-digit", minute:"2-digit"});
 const round2 = n => Math.round(n * 100) / 100;
 const parseMoney = v => { const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? round2(n) : NaN; };
-const METHODS = {efectivo:"Efectivo", transferencia:"Transferencia / MP", tarjeta:"Tarjeta"};
 const KINDS = {venta:"Venta", "cobro-deuda":"Cobro de deuda", cuenta:"Cuenta mensual"};
-const methodOptions = () => Object.entries(METHODS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
 const who = () => ({by: S().me.email, byName: S().me.name});
 const rem = d => Math.max(0, round2((+d.amount || 0) - (+d.paidAmount || 0)));
 
@@ -103,9 +101,6 @@ function renderTotals(){
   const sum = f => round2(sales.filter(f).reduce((a, s) => a + (+s.amount || 0), 0));
   $("#cTotalLabel").textContent = day === dayKey() ? "Total de hoy" : "Total del " + fmtDay(day);
   $("#cTotal").textContent = money(sum(() => true));
-  $("#cCash").textContent = money(sum(s => s.method === "efectivo"));
-  $("#cTransfer").textContent = money(sum(s => s.method === "transferencia"));
-  $("#cCard").textContent = money(sum(s => s.method === "tarjeta"));
   $("#cOwed").textContent = money(round2(pending.reduce((a, d) => a + rem(d), 0)));
   const people = new Set(pending.map(d => d.name.trim().toLowerCase())).size;
   $("#cOwedN").textContent = people ? `${people} persona${people > 1 ? "s" : ""}` : "nadie debe";
@@ -122,7 +117,7 @@ function renderSales(){
   el.innerHTML = sales.map(s => `<li data-id="${esc(s.id)}">
     <div class="row"><span><span class="meta">${hhmm(s.ts)}</span> ${s.items ? "Venta" + (s.items.length > 1 ? ` (${s.items.length} productos)` : "") : esc(s.note || KINDS[s.kind] || "Venta")}</span><b class="num">${money(s.amount)}</b></div>
     ${s.items ? `<ul class="sale-items">${s.items.map(i => `<li><span>${i.qty} × ${esc(i.name)}</span><span class="num">${money(i.amount)}</span></li>`).join("")}</ul>` : ""}
-    <div class="row"><span class="meta">${METHODS[s.method] || esc(s.method)}${s.kind && s.kind !== "venta" ? " · " + KINDS[s.kind] : ""} · ${esc(s.byName || s.by || "")}</span>
+    <div class="row"><span class="meta">${s.kind && s.kind !== "venta" ? KINDS[s.kind] + " · " : ""}${esc(s.byName || s.by || "")}</span>
       ${s.kind === "venta" || !s.kind || S().me.isAdmin ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
   </li>`).join("");
 }
@@ -131,7 +126,7 @@ $("#saleForm").addEventListener("submit", e => {
   const amount = parseMoney($("#sAmount").value);
   if (!(amount > 0)) { S().toast("Escribí el monto de la venta."); $("#sAmount").focus(); return; }
   fire(S().fs.collection("sales").doc().set({
-    amount, method: $("#sMethod").value, note: $("#sNote").value.trim(),
+    amount, note: $("#sNote").value.trim(),
     kind: "venta", day, ts: Date.now(), ...who()
   }));
   $("#sAmount").value = ""; $("#sNote").value = ""; $("#sAmount").focus();
@@ -209,7 +204,6 @@ function renderDebts(){
           <span class="meta">Cobrar a ${esc(g.name)} · ${esc(d.note || "Sin detalle")}</span>
           <span class="pay-inputs">
             <input name="amt" type="number" step="0.01" min="0" value="${rem(d)}" aria-label="Monto que paga">
-            <select name="method" aria-label="Medio de pago">${methodOptions()}</select>
             <button class="btn sm primary" type="submit">Confirmar</button>
             <button class="btn sm" type="button" data-act="pay-cancel">Cancelar</button>
           </span>
@@ -264,13 +258,13 @@ $("#debtList").addEventListener("submit", e => {
   const saleRef = fs.collection("sales").doc();
   // El cobro entra en la caja del día en que se cobra.
   batch.set(saleRef, {
-    amount: paidNow, method: f.method.value, kind: "cobro-deuda", debtId: d.id,
+    amount: paidNow, kind: "cobro-deuda", debtId: d.id,
     note: "Cobro de deuda: " + d.name + (d.note ? " (" + d.note + ")" : ""),
     day: dayKey(), ts: Date.now(), ...who()
   });
   const upd = {
     paidAmount: FV().increment(paidNow),
-    payments: FV().arrayUnion({ts: Date.now(), amount: paidNow, method: f.method.value, by: S().me.email, saleId: saleRef.id})
+    payments: FV().arrayUnion({ts: Date.now(), amount: paidNow, by: S().me.email, saleId: saleRef.id})
   };
   if (full) Object.assign(upd, {paid: true, paidAt: Date.now(), paidBy: S().me.email});
   batch.update(fs.doc("debts/" + d.id), upd);
@@ -311,7 +305,7 @@ function renderAccounts(){
         <div><h3>${esc(a.name)}</h3><span class="tag">${a.type === "colegio" ? "Colegio" : "Particular"}</span></div>
         <div class="acc-total"><span class="label">${monthName(month)}</span><b class="num">${money(total)}</b></div>
       </header>
-      ${st ? `<div class="paid-banner">Pagado el ${fmtDate(st.settledAt)} · ${METHODS[st.method] || ""} <button class="link-btn" type="button" data-act="unsettle">Deshacer</button></div>` : ""}
+      ${st ? `<div class="paid-banner">Pagado el ${fmtDate(st.settledAt)} <button class="link-btn" type="button" data-act="unsettle">Deshacer</button></div>` : ""}
       <div class="table-wrap"><table class="inv-table"><tbody>
         ${es.map(e => `<tr data-id="${esc(e.id)}">
           <td class="t">${fmtDate(e.ts)}</td>
@@ -330,7 +324,7 @@ function renderAccounts(){
       <footer>
         <button class="btn sm primary" type="button" data-act="invoice" ${es.length ? "" : "disabled"}>Ver resumen / factura</button>
         ${st ? "" : settlingId === a.id ? `
-          <span class="pay-inputs"><select name="method" aria-label="Medio de pago">${methodOptions()}</select>
+          <span class="pay-inputs">
           <button class="btn sm" type="button" data-act="settle-ok">Confirmar pago de ${money(total)}</button>
           <button class="link-btn" type="button" data-act="settle-cancel">Cancelar</button></span>`
         : `<button class="btn sm" type="button" data-act="settle" ${es.length ? "" : "disabled"}>Marcar como pagado</button>`}
@@ -413,15 +407,14 @@ $("#accGrid").addEventListener("click", e => {
     case "settle": settlingId = a.id; renderAccounts(); break;
     case "settle-cancel": settlingId = null; renderAccounts(); break;
     case "settle-ok": {
-      const method = card.querySelector("select[name='method']").value;
       const batch = fs.batch();
       const saleRef = fs.collection("sales").doc();
       batch.set(saleRef, {
-        amount: total, method, kind: "cuenta", note: `Cuenta mensual: ${a.name} (${monthName(month)})`,
+        amount: total, kind: "cuenta", note: `Cuenta mensual: ${a.name} (${monthName(month)})`,
         day: dayKey(), ts: Date.now(), ...who()
       });
       batch.set(fs.doc(`accountMonths/${a.id}_${month}`), {
-        accountId: a.id, month, total, method, saleId: saleRef.id, settledAt: Date.now(), ...who()
+        accountId: a.id, month, total, saleId: saleRef.id, settledAt: Date.now(), ...who()
       });
       fire(batch.commit());
       settlingId = null;
