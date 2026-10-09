@@ -153,6 +153,17 @@ html,body{margin:0}
 .sale-items li{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding:0;border:0}
 @media (max-width:700px){.pay-methods{grid-template-columns:1fr}.cart-items li{grid-template-columns:minmax(0,1fr) auto auto}.ci-sub{display:none}}
 
+/* Escanear con la cámara */
+.cam-btn{gap:8px;font-weight:600}
+.cam-dialog{width:min(560px,calc(100vw - 24px))}
+.cam-view{background:#000;border-radius:10px;overflow:hidden;min-height:220px;display:grid;place-items:center}
+#camReader{width:100%;border:0!important}
+#camReader video{width:100%!important;height:auto!important;display:block}
+#camReader img[alt="Info icon"],#camReader img[alt="Camera based scan"]{display:none}
+.cam-status{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.cam-last{padding:8px 12px;border-radius:var(--r);background:var(--ok-soft);color:var(--ok);font-size:14.5px}
+.cam-last b{color:var(--fg)}
+
 /* Borrar datos de prueba */
 .cleanup{display:grid;gap:10px;padding:14px 16px}
 .check{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14.5px;cursor:pointer}

@@ -136,6 +136,7 @@ function startApp(){
   scanInput.focus();
 }
 function stopApp(){
+  closeCamera();
   if (store) store.stop();
   if (window.AdminPanel) window.AdminPanel.stop();
   if (window.Caja) window.Caja.stop();
@@ -703,7 +704,8 @@ $("#btnDelete").addEventListener("click", async () => {
   if (ok) { dlgP.close(); toast("Eliminado: " + name); }
 });
 document.querySelectorAll("dialog [data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
-document.querySelectorAll("dialog").forEach(d => d.addEventListener("close", () => setTimeout(() => scanInput.focus(), 20)));
+// Al cerrar una ventana, volver al campo de escaneo (salvo que quede otra abierta, como el alta de producto).
+document.querySelectorAll("dialog").forEach(d => d.addEventListener("close", () => setTimeout(() => { if (!document.querySelector("dialog[open]")) scanInput.focus(); }, 20)));
 
 /* ---------- etiquetas ---------- */
 const dlgL = $("#dlgLabel");
@@ -804,6 +806,79 @@ $("#fCode").addEventListener("keydown", e => {
   if (!editing && !$("#fName").value.trim()) lookupName($("#fCode").value.trim());
   ($("#fName").value.trim() ? $("#fPrice") : $("#fName")).focus();
 });
+/* ---------- escanear con la cámara ---------- */
+const dlgCam = $("#dlgCamera");
+let cam = null, camTarget = "scan", camLast = {code: "", t: 0};
+const camFormats = () => {
+  const F = Html5QrcodeSupportedFormats;
+  return [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF];
+};
+async function openCamera(target){
+  if (!window.Html5Qrcode) { toast("No se pudo cargar el lector de la cámara. Revisá la conexión."); return; }
+  if (!window.isSecureContext) { toast("La cámara solo funciona en la página publicada (con https)."); return; }
+  camTarget = target;
+  $("#camKeepWrap").hidden = target !== "scan" || mode === "look";
+  $("#camLast").hidden = true;
+  $("#camStatus").textContent = "Abriendo la cámara…";
+  dlgCam.showModal();
+  try {
+    cam = new Html5Qrcode("camReader", {formatsToSupport: camFormats(), useBarCodeDetectorIfSupported: true, verbose: false});
+    await cam.start({facingMode: "environment"}, {
+      fps: 12,
+      // Recuadro ancho y bajo: la forma de un código de barras.
+      qrbox: (w, h) => { const width = Math.floor(Math.min(w * 0.85, 420)); return {width, height: Math.floor(Math.min(h * 0.5, width * 0.5))}; },
+      aspectRatio: 1.333
+    }, onCameraCode, () => {});
+    $("#camStatus").textContent = "Apuntá al código de barras dentro del recuadro y mantené el celular quieto. Con buena luz lee más rápido.";
+  } catch(e){
+    const msg = String((e && (e.name || e.message)) || e);
+    $("#camStatus").textContent =
+      /NotAllowed|Permission/i.test(msg) ? "No hay permiso para usar la cámara. Tocá el candado de la barra de direcciones, permití la cámara y volvé a intentar."
+      : /NotFound|Requested device not found/i.test(msg) ? "No se encontró ninguna cámara en este dispositivo."
+      : /NotReadable|in use/i.test(msg) ? "La cámara la está usando otra aplicación. Cerrala y volvé a intentar."
+      : "No se pudo abrir la cámara (" + msg + ").";
+    reportError("cámara", msg);
+    cam = null;
+  }
+}
+async function closeCamera(){
+  const c = cam; cam = null;
+  if (c) { try { if (c.isScanning) await c.stop(); c.clear(); } catch(e){} }
+  if (dlgCam.open) dlgCam.close();
+}
+function onCameraCode(text){
+  let code = String(text).trim();
+  const now = Date.now();
+  // El mismo código sigue frente a la cámara: no contarlo dos veces.
+  if (code === camLast.code && now - camLast.t < 2500) return;
+  camLast = {code, t: now};
+  // Algunos celulares leen como UPC-A (12 dígitos) un EAN-13 que empieza con 0.
+  if (/^\d{12}$/.test(code) && products.has("0" + code)) code = "0" + code;
+  if (navigator.vibrate) navigator.vibrate(60);
+
+  if (camTarget === "field") {   // cargando el código en el formulario de producto
+    $("#fCode").value = code;
+    closeCamera();
+    if (!editing && !$("#fName").value.trim()) lookupName(code);
+    ($("#fName").value.trim() ? $("#fPrice") : $("#fName")).focus();
+    return;
+  }
+  const p = products.get(code);
+  if (p) {
+    const last = $("#camLast");
+    last.hidden = false;
+    last.innerHTML = `<b>${esc(p.name)}</b> <span class="meta">${mode === "sell" ? "· agregado al ticket" : mode === "in" ? "· sumado al stock" : ""}</span>`;
+  }
+  // Producto nuevo o consulta: cerrar para ver el alta o el resultado.
+  const keep = !!p && mode !== "look" && $("#camKeep").checked;
+  if (!keep) closeCamera();
+  handleScan(code);
+}
+$("#btnCamera").addEventListener("click", () => openCamera("scan"));
+$("#btnCodeCamera").addEventListener("click", () => openCamera("field"));
+$("#camClose").addEventListener("click", closeCamera);
+dlgCam.addEventListener("close", () => { if (cam) closeCamera(); });   // también al cerrar con Esc
+
 /* ---------- login ---------- */
 const loginErrors = {
   "auth/popup-closed-by-user":"",
