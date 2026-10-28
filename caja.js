@@ -179,7 +179,7 @@ function makeTicket(listSel, amountSel){
 
 /* Venta desde la Caja: escaneando productos (se descuentan del stock) o poniendo solo el monto. */
 const saleT = makeTicket("#sItems", "#sAmount");
-const scan = saleT.scan;
+const scan = raw => active.scan(raw);
 $("#sScan").addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   e.preventDefault();
@@ -187,7 +187,7 @@ $("#sScan").addEventListener("keydown", e => {
   if (v.trim()) scan(v);
   else if (saleT.map.size || $("#sAmount").value) $("#saleForm").requestSubmit();   // Enter vacío: cobrar
 });
-$("#sCamera").addEventListener("click", () => S().openCamera("callback", scan));
+$("#sCamera").addEventListener("click", () => S().openCamera("callback", saleT.scan));
 $("#saleForm").addEventListener("submit", e => {
   e.preventDefault();
   const lines = saleT.lines();
@@ -307,7 +307,16 @@ $("#dScan").addEventListener("keydown", e => {
   if (v.trim()) debtT.scan(v);
   else if (debtT.map.size || $("#dAmount").value) $("#debtForm").requestSubmit();   // Enter vacío: anotar
 });
-$("#dCamera").addEventListener("click", () => S().openCamera("callback", debtT.scan));
+// Enter en el nombre: pasar al campo del lector en vez de anotar.
+$("#dName").addEventListener("keydown", e => {
+  if (e.key !== "Enter" || debtT.map.size || $("#dAmount").value) return;
+  e.preventDefault(); $("#dScan").focus();
+});
+// El lector USB carga en el último formulario que se usó (Ventas o Deudas),
+// aunque el cursor no esté en el campo.
+let active = saleT;
+$("#saleForm").addEventListener("focusin", () => { active = saleT; });
+$("#debtForm").addEventListener("focusin", () => { active = debtT; });
 
 $("#debtForm").addEventListener("submit", e => {
   e.preventDefault();
@@ -339,6 +348,7 @@ $("#debtForm").addEventListener("submit", e => {
   fire(batch.commit());
   debtT.clear();
   $("#dName").value = ""; $("#dAmount").value = ""; $("#dNote").value = ""; $("#dName").focus();
+  active = debtT;
   S().toast("Deuda anotada: " + S().money(amount) + (lines.length ? " · descontado del stock" : ""));
 });
 // Borrar una deuda: si tenía productos, vuelven al stock.
