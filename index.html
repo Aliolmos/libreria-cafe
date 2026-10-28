@@ -194,9 +194,18 @@
         <form class="caja-form" id="debtForm" novalidate>
           <input id="dName" class="grow" maxlength="80" list="debtNames" placeholder="Nombre de la persona" aria-label="Nombre de la persona" autocomplete="off">
           <datalist id="debtNames"></datalist>
+          <div class="sale-scan">
+            <input id="dScan" class="grow" autocomplete="off" spellcheck="false" placeholder="Escaneá lo que se lleva" aria-label="Escanear producto">
+            <button class="btn cam-btn" type="button" id="dCamera">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M16 8v8"/></svg>
+              Cámara
+            </button>
+          </div>
+          <ul class="cart-items sale-ticket" id="dItems" hidden></ul>
           <input id="dAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Monto" aria-label="Monto que debe">
-          <input id="dNote" class="grow" maxlength="120" placeholder="Qué se llevó (opcional)" aria-label="Detalle">
+          <input id="dNote" class="grow" maxlength="120" placeholder="Detalle (opcional)" aria-label="Detalle">
           <button class="btn primary" type="submit">Anotar deuda</button>
+          <p class="meta sale-help">Escaneá lo que se lleva y el monto se completa solo (se descuenta del stock). O escribí solo el monto.</p>
         </form>
         <ul class="plain-list" id="debtList"><li class="empty">Nadie debe nada.</li></ul>
       </section>
@@ -268,7 +277,7 @@
           <label class="check"><input type="checkbox" id="clAllSales"> Toda la caja (ventas y cobros de todos los días)</label>
           <label class="check"><input type="checkbox" id="clDebts"> Todas las deudas (fiado), pendientes y pagadas</label>
           <label class="check"><input type="checkbox" id="clAccounts"> Todas las cuentas mensuales, con sus retiros y pagos</label>
-          <label class="check sub-check"><input type="checkbox" id="clRestock" checked> Devolver al stock los productos de las ventas y retiros que se borran</label>
+          <label class="check sub-check"><input type="checkbox" id="clRestock" checked> Devolver al stock los productos de las ventas, deudas y retiros que se borran</label>
           <div class="cleanup-actions">
             <button class="btn danger" type="submit" id="btnCleanup">Revisar qué se va a borrar</button>
           </div>

@@ -140,7 +140,7 @@ function renderMoves(){
   const {esc, int} = S();
   const who = $("#movesUser").value;
   const list = allMoves.filter(m => !who || m.by === who);
-  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición", cuenta:"Cuenta mensual", venta:"Venta", "anulación":"Venta borrada"};
+  const src = {scan:"Escáner", manual:"Botón +/−", alta:"Alta", ajuste:"Edición", cuenta:"Cuenta mensual", venta:"Venta", fiado:"Fiado", "anulación":"Anulación"};
   $("#allMoves").innerHTML = list.map(m => {
     const d = m.type === "set" ? "=" + m.qtyAfter : (m.delta > 0 ? "+" : "") + m.delta;
     const color = m.type === "set" ? "--accent" : m.delta >= 0 ? "--ok" : "--bad";
@@ -198,7 +198,7 @@ $("#cleanupForm").addEventListener("submit", async e => {
     const [y, m, d] = (opt.day || "--").split("-");
     const parts = [];
     if (opt.allSales || opt.day) parts.push(`<b>${plan.sales.length}</b> venta(s) y cobro(s) ${opt.allSales ? "de toda la caja" : `del ${d}/${m}/${y}`} (${money(total)})`);
-    if (opt.debts) parts.push(`<b>${plan.debts.length}</b> deuda(s)`);
+    if (opt.debts) parts.push(`<b>${plan.debts.length}</b> deuda(s)${opt.restock && plan.debts.some(d => d.data().items) ? " (los productos vuelven al stock)" : ""}`);
     if (opt.accounts) parts.push(`<b>${plan.accounts.length}</b> cuenta(s) mensual(es) con <b>${plan.entries.length}</b> retiro(s)${opt.restock ? " (los productos vuelven al stock)" : ""}`);
     const empty = !plan.sales.length && !plan.debts.length && !plan.accounts.length && !plan.entries.length && !plan.months.length;
     $("#cleanupSummary").innerHTML = empty
@@ -227,8 +227,13 @@ $("#btnCleanupOk").addEventListener("click", async () => {
       const restocks = data.items && plan.opt.restock;
       if (keepsDebt || keepsAccount || restocks) await window.Caja.undoSale(s.id, data);
     }
-    // Devolver al stock lo que se llevaron las cuentas (antes de borrar los retiros).
+    // Devolver al stock lo que se llevaron las cuentas y las deudas (antes de borrarlas).
     if (plan.opt.restock) {
+      for (const dd of plan.debts) {
+        for (const i of (dd.data().items || [])) {
+          if (S().products.has(i.code)) await S().changeStock(i.code, +i.qty || 0, "fiado");
+        }
+      }
       for (const en of plan.entries) {
         const e = en.data();
         if (e.code && S().products.has(e.code)) await S().changeStock(e.code, +e.qty || 0, "cuenta");

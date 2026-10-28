@@ -1,4 +1,3 @@
-
 /* Layout: barra de escaneo arriba (la acción principal), métricas, luego inventario + historial en dos columnas que se apilan en móvil */
 /* Base neutra; los colores de los lápices del logo (azul, naranja, amarillo, verde) solo como acentos.
    El rosa queda para el logo y la factura. */
@@ -97,6 +96,7 @@ html,body{margin:0}
 .toggle button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
 .row-actions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
 .debt-group .sub{padding-left:12px;border-left:2px solid var(--line)}
+.debt-group .sub .sale-items{flex:1 1 100%}
 .owed{color:var(--bad)}
 .pay-form{display:grid;gap:6px}
 .pay-inputs{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}

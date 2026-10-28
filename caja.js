@@ -121,10 +121,8 @@ function renderSales(){
       ${s.kind === "venta" || !s.kind || S().me.isAdmin ? '<button class="link-btn" type="button" data-act="del-sale">Borrar</button>' : ""}</div>
   </li>`).join("");
 }
-/* Venta desde la Caja: escaneando productos (se descuentan del stock) o poniendo solo el monto. */
-const ticket = new Map();       // código -> cantidad
-let amountEdited = false;       // si escribieron el monto a mano, no pisarlo con la suma
-
+/* Ticket de productos escaneados: lo usan la venta y la deuda.
+   El monto se completa con la suma, salvo que lo escriban a mano. */
 function findByCodeOrName(text){
   const t = String(text || "").trim(); if (!t) return null;
   const products = S().products;
@@ -135,64 +133,64 @@ function findByCodeOrName(text){
   for (const p of products.values()) if (p.name.toLowerCase() === low) return p;
   return null;
 }
-function scan(raw){
-  const code = String(raw || "").trim(); if (!code) return;
-  const p = findByCodeOrName(code);
-  if (p) {
-    ticket.set(p.code, (ticket.get(p.code) || 0) + 1);
-    renderTicket(p.code);
-    S().beep(880);
-    return;
-  }
-  // Código que no está cargado: alta rápida (el nombre es opcional) y va directo a esta venta.
-  S().beep(330);
-  S().openProduct(null, code, "", newCode => {
-    ticket.set(newCode, (ticket.get(newCode) || 0) + 1);
-    renderTicket(newCode);
+function makeTicket(listSel, amountSel){
+  const t = {map: new Map(), edited: false};
+  const add = code => { t.map.set(code, (t.map.get(code) || 0) + 1); t.render(code); };
+  t.lines = () => S().linesFrom(t.map);
+  t.sum = () => round2(t.lines().reduce((s, l) => s + l.amount, 0));
+  t.render = justAdded => {
+    const {esc, money, int} = S();
+    const lines = t.lines(), el = $(listSel);
+    el.hidden = !lines.length;
+    el.innerHTML = lines.map(l => `
+      <li data-code="${esc(l.code)}"${l.code === justAdded ? ' class="just"' : ""}>
+        <div class="ci-name"><b>${esc(l.name)}</b><span class="meta">${money(l.unitPrice)} c/u${l.qty > l.stock ? ` · <span class="warn-text">quedan ${int(l.stock)} en stock</span>` : ""}</span></div>
+        <span class="stock-cell">
+          <button class="btn icon-btn" type="button" data-t="dec" aria-label="Uno menos">−</button>
+          <span class="q">${int(l.qty)}</span>
+          <button class="btn icon-btn" type="button" data-t="inc" aria-label="Uno más">+</button>
+        </span>
+        <b class="num ci-sub">${money(l.amount)}</b>
+        <button class="link-btn" type="button" data-t="del" aria-label="Sacar">✕</button>
+      </li>`).join("");
+    if (!t.edited) $(amountSel).value = lines.length ? t.sum() : "";
+  };
+  t.scan = raw => {
+    const code = String(raw || "").trim(); if (!code) return;
+    const p = findByCodeOrName(code);
+    if (p) { add(p.code); S().beep(880); return; }
+    // Código que no está cargado: alta rápida (el nombre es opcional) y va directo a este ticket.
+    S().beep(330);
+    S().openProduct(null, code, "", add);
+  };
+  t.clear = () => { t.map.clear(); t.edited = false; $(listSel).hidden = true; $(listSel).innerHTML = ""; };
+  $(amountSel).addEventListener("input", () => { t.edited = $(amountSel).value !== ""; });
+  $(listSel).addEventListener("click", e => {
+    const b = e.target.closest("[data-t]"); if (!b) return;
+    const code = b.closest("li").dataset.code;
+    const q = t.map.get(code) || 0;
+    if (b.dataset.t === "inc") t.map.set(code, q + 1);
+    else if (b.dataset.t === "dec") q > 1 ? t.map.set(code, q - 1) : t.map.delete(code);
+    else t.map.delete(code);
+    t.render();
   });
+  return t;
 }
-function renderTicket(justAdded){
-  const {esc, money, int} = S();
-  const lines = S().linesFrom(ticket);
-  const el = $("#sItems");
-  el.hidden = !lines.length;
-  el.innerHTML = lines.map(l => `
-    <li data-code="${esc(l.code)}"${l.code === justAdded ? ' class="just"' : ""}>
-      <div class="ci-name"><b>${esc(l.name)}</b><span class="meta">${money(l.unitPrice)} c/u${l.qty > l.stock ? ` · <span class="warn-text">quedan ${int(l.stock)} en stock</span>` : ""}</span></div>
-      <span class="stock-cell">
-        <button class="btn icon-btn" type="button" data-t="dec" aria-label="Uno menos">−</button>
-        <span class="q">${int(l.qty)}</span>
-        <button class="btn icon-btn" type="button" data-t="inc" aria-label="Uno más">+</button>
-      </span>
-      <b class="num ci-sub">${money(l.amount)}</b>
-      <button class="link-btn" type="button" data-t="del" aria-label="Sacar">✕</button>
-    </li>`).join("");
-  if (!amountEdited) {
-    const sum = round2(lines.reduce((s, l) => s + l.amount, 0));
-    $("#sAmount").value = lines.length ? sum : "";
-  }
-}
+
+/* Venta desde la Caja: escaneando productos (se descuentan del stock) o poniendo solo el monto. */
+const saleT = makeTicket("#sItems", "#sAmount");
+const scan = saleT.scan;
 $("#sScan").addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   e.preventDefault();
   const v = $("#sScan").value; $("#sScan").value = "";
   if (v.trim()) scan(v);
-  else if (ticket.size || $("#sAmount").value) $("#saleForm").requestSubmit();   // Enter vacío: cobrar
+  else if (saleT.map.size || $("#sAmount").value) $("#saleForm").requestSubmit();   // Enter vacío: cobrar
 });
 $("#sCamera").addEventListener("click", () => S().openCamera("callback", scan));
-$("#sAmount").addEventListener("input", () => { amountEdited = $("#sAmount").value !== ""; });
-$("#sItems").addEventListener("click", e => {
-  const b = e.target.closest("[data-t]"); if (!b) return;
-  const code = b.closest("li").dataset.code;
-  const q = ticket.get(code) || 0;
-  if (b.dataset.t === "inc") ticket.set(code, q + 1);
-  else if (b.dataset.t === "dec") q > 1 ? ticket.set(code, q - 1) : ticket.delete(code);
-  else ticket.delete(code);
-  renderTicket();
-});
 $("#saleForm").addEventListener("submit", e => {
   e.preventDefault();
-  const lines = S().linesFrom(ticket);
+  const lines = saleT.lines();
   const typed = parseMoney($("#sAmount").value);
   const note = $("#sNote").value.trim();
   if (lines.length) {
@@ -204,8 +202,7 @@ $("#saleForm").addEventListener("submit", e => {
     fire(S().fs.collection("sales").doc().set({amount: typed, note, kind: "venta", day, ts: Date.now(), ...who()}));
   }
   S().toast("Venta agregada: " + S().money(lines.length && !(typed >= 0) ? round2(lines.reduce((s, l) => s + l.amount, 0)) : typed));
-  ticket.clear(); amountEdited = false;
-  $("#sItems").hidden = true; $("#sItems").innerHTML = "";
+  saleT.clear();
   $("#sAmount").value = ""; $("#sNote").value = "";
   $("#sScan").focus();
 });
@@ -287,10 +284,11 @@ function renderDebts(){
           </span>
         </form>` : `
         <div class="row sub" data-id="${esc(d.id)}">
-          <span class="meta">${fmtDate(d.ts)} · ${esc(d.note || "Sin detalle")}${d.paidAmount ? ` · pagó ${money(d.paidAmount)} de ${money(d.amount)}` : ""}</span>
+          <span class="meta">${fmtDate(d.ts)} · ${d.items ? d.items.length + " producto" + (d.items.length > 1 ? "s" : "") : esc(d.note || "Sin detalle")}${d.paidAmount ? ` · pagó ${money(d.paidAmount)} de ${money(d.amount)}` : ""}</span>
           <span class="row-actions"><span class="num">${money(rem(d))}</span>
             <button class="btn sm primary" type="button" data-act="pay">Cobrar</button>
             <button class="link-btn" type="button" data-act="del-debt">Borrar</button></span>
+          ${d.items ? `<ul class="sale-items">${d.items.map(i => `<li><span>${i.qty} × ${esc(i.name)}</span><span class="num">${money(i.amount)}</span></li>`).join("")}</ul>` : ""}
         </div>`).join("")}
     </li>`;
   }).join("");
@@ -300,27 +298,77 @@ function renderDebts(){
 document.querySelectorAll("[data-debts]").forEach(b => b.addEventListener("click", () => {
   debtTab = b.dataset.debts; payingId = null; renderDebts();
 }));
+/* Deuda con productos escaneados: se descuentan del stock y quedan anotados en la deuda. */
+const debtT = makeTicket("#dItems", "#dAmount");
+$("#dScan").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = $("#dScan").value; $("#dScan").value = "";
+  if (v.trim()) debtT.scan(v);
+  else if (debtT.map.size || $("#dAmount").value) $("#debtForm").requestSubmit();   // Enter vacío: anotar
+});
+$("#dCamera").addEventListener("click", () => S().openCamera("callback", debtT.scan));
+
 $("#debtForm").addEventListener("submit", e => {
   e.preventDefault();
-  const name = $("#dName").value.trim(), amount = parseMoney($("#dAmount").value);
+  const name = $("#dName").value.trim();
+  const lines = debtT.lines();
+  const typed = parseMoney($("#dAmount").value);
+  const amount = typed >= 0 ? typed : debtT.sum();
   if (!name) { S().toast("Escribí el nombre de la persona."); $("#dName").focus(); return; }
-  if (!(amount > 0)) { S().toast("Escribí cuánto debe."); $("#dAmount").focus(); return; }
+  if (!(amount > 0)) { S().toast("Escaneá un producto o escribí cuánto debe."); $("#dScan").focus(); return; }
   // Si ya debía algo, usar el nombre tal como está escrito para que se agrupe.
   const known = pending.find(d => d.name.trim().toLowerCase() === name.toLowerCase());
-  fire(S().fs.collection("debts").doc().set({
-    name: known ? known.name.trim() : name, amount, note: $("#dNote").value.trim(),
-    paid: false, paidAmount: 0, payments: [], ts: Date.now(), day: dayKey(), ...who()
-  }));
+  const {fs} = S(), now = Date.now();
+  const batch = fs.batch();
+  // Lo que se lleva sale del stock.
+  lines.forEach(l => {
+    batch.update(fs.collection("products").doc(S().docId(l.code)), {qty: FV().increment(-l.qty), updatedAt: now});
+    batch.set(fs.collection("moves").doc(), {
+      code: l.code, name: l.name, delta: -l.qty, type: "out", qtyAfter: l.stock - l.qty,
+      ts: now, source: "fiado", ...who()
+    });
+  });
+  const note = $("#dNote").value.trim() || lines.map(l => `${l.qty}× ${l.name}`).join(", ").slice(0, 200);
+  const debt = {
+    name: known ? known.name.trim() : name, amount, note,
+    paid: false, paidAmount: 0, payments: [], ts: now, day: dayKey(), ...who()
+  };
+  if (lines.length) debt.items = lines.map(({stock, ...l}) => l);
+  batch.set(fs.collection("debts").doc(), debt);
+  fire(batch.commit());
+  debtT.clear();
   $("#dName").value = ""; $("#dAmount").value = ""; $("#dNote").value = ""; $("#dName").focus();
-  S().toast("Deuda anotada");
+  S().toast("Deuda anotada: " + S().money(amount) + (lines.length ? " · descontado del stock" : ""));
 });
+// Borrar una deuda: si tenía productos, vuelven al stock.
+function deleteDebt(d){
+  const {fs} = S(), now = Date.now();
+  const batch = fs.batch();
+  batch.delete(fs.doc("debts/" + d.id));
+  (d.items || []).forEach(i => {
+    if (!S().products.has(i.code)) return;
+    batch.update(fs.collection("products").doc(S().docId(i.code)), {qty: FV().increment(+i.qty || 0), updatedAt: now});
+    batch.set(fs.collection("moves").doc(), {
+      code: i.code, name: i.name, delta: +i.qty || 0, type: "in",
+      qtyAfter: (Number(S().products.get(i.code).qty) || 0) + (+i.qty || 0),
+      ts: now, source: "anulación", ...who()
+    });
+  });
+  return batch.commit();
+}
 $("#debtList").addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   const id = b.closest("[data-id]")?.dataset.id;
   if (act === "pay") { payingId = id; renderDebts(); }
   else if (act === "pay-cancel") { payingId = null; renderDebts(); }
-  else if (act === "del-debt") { if (confirmTwice(b, "¿Borrar?")) fire(S().fs.doc("debts/" + id).delete()); }
+  else if (act === "del-debt") {
+    const d = pending.find(x => x.id === id); if (!d) return;
+    if (!confirmTwice(b, d.items ? "¿Borrar y devolver al stock?" : "¿Borrar?")) return;
+    fire(deleteDebt(d));
+    if (d.items) S().toast("Deuda borrada. Los productos volvieron al stock.");
+  }
   else if (act === "debt-invoice") debtInvoice(b.closest(".debt-group").dataset.name);
 });
 $("#debtList").addEventListener("submit", e => {
@@ -533,11 +581,17 @@ function accountInvoice(a, es, total, st){
 function debtInvoice(name){
   const items = pending.filter(d => d.name.trim().toLowerCase() === name.toLowerCase()).sort((a, b) => a.ts - b.ts);
   if (!items.length) return;
-  const lines = items.map(d => ({
-    date: fmtDate(d.ts),
-    desc: (d.note || "Compra") + (d.paidAmount ? ` (pagó ${S().money(d.paidAmount)} de ${S().money(d.amount)})` : ""),
-    qty: 1, unit: rem(d), amount: rem(d)
-  }));
+  const lines = items.flatMap(d => {
+    const sum = d.items ? round2(d.items.reduce((s, i) => s + (+i.amount || 0), 0)) : 0;
+    // Con productos y sin pagos ni monto corregido: una línea por producto.
+    if (d.items && !d.paidAmount && Math.abs(sum - d.amount) < 0.005)
+      return d.items.map(i => ({date: fmtDate(d.ts), desc: i.name, qty: i.qty, unit: i.unitPrice, amount: i.amount}));
+    return [{
+      date: fmtDate(d.ts),
+      desc: (d.note || "Compra") + (d.paidAmount ? ` (pagó ${S().money(d.paidAmount)} de ${S().money(d.amount)})` : ""),
+      qty: 1, unit: rem(d), amount: rem(d)
+    }];
+  });
   openInvoice({
     title: "DETALLE DE DEUDA", client: name, period: "Al " + fmtFull(Date.now()),
     lines, total: round2(lines.reduce((s, l) => s + l.amount, 0)), paid: null,
